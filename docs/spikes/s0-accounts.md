@@ -147,7 +147,7 @@ Rule that follows: Gemini free content is used by Google to improve its products
 
 - **No non-200 response was ever seen.** After every run chat (same model), embedding and a second chat model (gemma-4) all still returned HTTP 200. About 7,000 of the 10,000 daily neurons were counted as spent, so the limit was not reached.
 - **Finding: throughput, not quota, was the limit.** Cloudflare handled only about 0.13-0.16 calls/s for 700-token answers regardless of 4, 6 or 8 workers, and run 3 slowed to 42 calls in 87 minutes. Treat the free tier as slow under sustained load: size the eval runner for it (small batches, long timeouts, retry on timeout) and show a "still working" state in the UI.
-- **Still unknown:** the exact error code and message when the daily allowance runs out, and whether anything is charged. Until measured, the adapter must treat ANY non-200 as "fall back to the next provider" and never assume the message text. The dashboard shows no charge so far (owner to confirm).
+- **Still unknown:** the exact error code and message when the daily allowance runs out, and whether anything is charged. Until measured, the adapter must treat ANY non-200 as "fall back to the next provider" and never assume the message text. Owner checked the dashboard (2026-10-19): **7.16k of 10k neurons used, no charge, no billing or upgrade prompt.** That matches our own count of about 7,000, so the `usage.neurons` value in each response is reliable for budget tracking.
 - The test can be repeated on a fresh day with a cheaper pattern (short prompts, embedding calls) only if the answer matters before Plan 2; otherwise we learn it from the first real occurrence, which the adapter handles by falling back.
 
 ## Still to record
