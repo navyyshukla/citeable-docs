@@ -1,6 +1,6 @@
 # S4: Render free cold start and memory with our dependencies
 
-Status: **partial**. Two cold measurements done (2026-10-18: 24.2 s and 21.8 s). The plan asks for 3 on different occasions; the third is still to do.
+Status: **done**. Three cold measurements on different occasions: 24.2 s, 21.8 s, 21.8 s (2026-10-18 and 2026-10-19). Decision: **proceed** with a "waking up" state in the UI.
 
 ## Setup (as deployed)
 - Service `citeable-docs-spike`, Render **Free** instance, no card, no environment variables.
@@ -19,15 +19,15 @@ Status: **partial**. Two cold measurements done (2026-10-18: 24.2 s and 21.8 s).
 | **Cold request #1** (after about 24 min idle) | **24.2 s**; the reply showed `uptime_s` 2.3, so it was a fresh process |
 | Request right after the cold one | 1.0 s |
 | **Cold request #2** (run by the owner from their own machine, after a long idle) | **21.8 s**; `uptime_s` 1.9 (fresh process), peak memory 71.7 MB |
-| Cold request #3 | not yet measured (owner to run tomorrow morning) |
+| **Cold request #3** (2026-10-19 05:07 IST, from the Claude shell, after several hours idle) | **21.8 s**; `uptime_s` 3.7 (fresh process), peak memory 71.8 MB |
 
 Render's dashboard banner says a free instance "will spin down with inactivity, which can delay requests by 50 seconds or more". Our one sample came in at 24 s, well under that.
 
 ## Decision rule
-Proceed if cold start is at most about 75 s and peak memory is at most about 60% of the RAM (about 307 MB). On the evidence so far: **meets both with wide margin (cold 24.2 s and 21.8 s; memory 72 MB of 512 MB).** Final call waits for sample 3 on a different occasion.
+Proceed if cold start is at most about 75 s and peak memory is at most about 60% of the RAM (about 307 MB). On the evidence so far: **meets both with wide margin (cold 24.2 s and 21.8 s; memory 72 MB of 512 MB).** Sample 3 agrees (21.8 s). **Final call: proceed.**
 
 ## Caveats (do not overstate)
-- **One cold sample.** Cold time varies with Render's capacity; the banner's 50 s or more is a warning that real wake-ups can be longer.
+- **Three cold samples, all 22-24 s.** Cold time varies with Render's capacity; the banner's 50 s or more is a warning that real wake-ups can be longer.
 - **This app is tiny.** It has no document index, no database connection, and no embedding or model calls. Real memory and startup will be higher. The 72 MB is the floor for our dependencies, not the app's cost.
 - **0.1 CPU is the bigger limit than 512 MB RAM.** Anything we compute at start-up (for example building a keyword index from all pieces) runs on a tenth of a core. Prefer loading lazily or reading a prebuilt index.
 - **Neon adds its own wake-up.** The database suspends after about 5 minutes idle, so the first question after a long gap can pay for both Render's and Neon's wake-up. Not measured here.
@@ -36,5 +36,5 @@ Proceed if cold start is at most about 75 s and peak memory is at most about 60%
 
 ## To finish
 - [x] Cold request #2.
-- [ ] Cold request #3 on a different occasion (idle 20 min or more, then one `curl` to `/health`).
-- [ ] Final decision: proceed with a "waking up" state in the UI, or trim.
+- [x] Cold request #3.
+- [x] Final decision: proceed with a "waking up" state in the UI. No trimming needed for this floor; revisit when the real app (index, DB) is measured in Plan 2.
