@@ -1,0 +1,11 @@
+# Spike results (Plan 1, Tasks 0-4)
+
+Status: DRAFT for the Task 5 review gate. Details are in the linked files; this table is the one-line view.
+
+| Spike | Result (one line) | Decision taken |
+|---|---|---|
+| [S0 accounts](s0-accounts.md) | Cloudflare chat and embedding work on the free plan; the plan's chat model id is deprecated; 3 of 4 candidate models are reasoning models that can return empty text; the free-quota wall was not reached in 3 attempts (throughput was the limit, about 0.15 calls/s); dashboard showed 7.16k of 10k neurons used and no charge | fallback models: Groq `gpt-oss-20b` for users, Gemini `gemini-3.5-flash-lite` for tests and judge (public data only); embedding_dim: 768; context window: aliased model unverified (nearest sibling 32k), so paste-all needs a 128k model; exhaustion: error code unknown, so the adapter treats any non-200 as "try the next provider"; answering model: **open, choose at this gate** |
+| [S1 sources](s1-sources.md) | `stable` matches the published headings on 2 of 3 pages; `stable` and `develop` differ in 13 of 32 files; inline `{help.*}` placeholders exist | ref: `stable`; command reference: see S1 (c); carry-overs: inline placeholders (Task 7), emphasis in headings (Task 8), anchors may be missing on the published page (Task 9) |
+| [S2 symbols](s2-symbols.md) | Word-only 8/9, symbol-aware 7/9, symbol-aware plus exact backticked-key path 9/9 (small, partly tuned set of 9 queries) | tokenizer: symbol-aware plus an exact backticked-key path with a definition-row boost, as its own tested step in Task 12 |
+| [S3 questions](s3-questions.md) | The plan's script found 11 (shallow scan); the extended count found 115 labelled issues with a maintainer reply and 164 answered Q&A discussions (counts, not quality) | real questions available: yes, viable; use 2023-onward items first, verify every answer against `stable`, keep candidate text out of git |
+| [S4 cold start](s4-coldstart.md) | Three cold requests: 24.2 s, 21.8 s, 21.8 s; peak memory 72 MB of 512 MB (floor for our dependencies only); instance is 0.1 CPU | proceed: UI shows a "waking up" state; pin the Python version on Render; load lazily because of the 0.1 CPU |
