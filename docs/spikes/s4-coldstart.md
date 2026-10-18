@@ -1,6 +1,6 @@
 # S4: Render free cold start and memory with our dependencies
 
-Status: **partial**. First cold measurement done (2026-10-18). The plan asks for 3 cold measurements on different occasions; 2 are still to do.
+Status: **partial**. Two cold measurements done (2026-10-18: 24.2 s and 21.8 s). The plan asks for 3 on different occasions; the third is still to do.
 
 ## Setup (as deployed)
 - Service `citeable-docs-spike`, Render **Free** instance, no card, no environment variables.
@@ -18,12 +18,13 @@ Status: **partial**. First cold measurement done (2026-10-18). The plan asks for
 | **Peak memory** | **72 MB** of 512 MB (14%) |
 | **Cold request #1** (after about 24 min idle) | **24.2 s**; the reply showed `uptime_s` 2.3, so it was a fresh process |
 | Request right after the cold one | 1.0 s |
-| Cold requests #2 and #3 | not yet measured |
+| **Cold request #2** (run by the owner from their own machine, after a long idle) | **21.8 s**; `uptime_s` 1.9 (fresh process), peak memory 71.7 MB |
+| Cold request #3 | not yet measured (owner to run tomorrow morning) |
 
 Render's dashboard banner says a free instance "will spin down with inactivity, which can delay requests by 50 seconds or more". Our one sample came in at 24 s, well under that.
 
 ## Decision rule
-Proceed if cold start is at most about 75 s and peak memory is at most about 60% of the RAM (about 307 MB). On the evidence so far: **meets both, with wide margin, but from one cold sample.** Final call waits for samples 2 and 3.
+Proceed if cold start is at most about 75 s and peak memory is at most about 60% of the RAM (about 307 MB). On the evidence so far: **meets both with wide margin (cold 24.2 s and 21.8 s; memory 72 MB of 512 MB).** Final call waits for sample 3 on a different occasion.
 
 ## Caveats (do not overstate)
 - **One cold sample.** Cold time varies with Render's capacity; the banner's 50 s or more is a warning that real wake-ups can be longer.
@@ -34,5 +35,6 @@ Proceed if cold start is at most about 75 s and peak memory is at most about 60%
 - Measurements were taken from the Claude shell, not from a visitor's browser.
 
 ## To finish
-- [ ] Cold request #2 and #3 on different occasions (idle 20 min or more, then one `curl` to `/health`).
+- [x] Cold request #2.
+- [ ] Cold request #3 on a different occasion (idle 20 min or more, then one `curl` to `/health`).
 - [ ] Final decision: proceed with a "waking up" state in the UI, or trim.

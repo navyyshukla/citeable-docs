@@ -159,7 +159,7 @@ Expected: two `200` lines, an `EMBEDDING DIM: <number>` line, and the chat resul
 
 Open the Workers AI model page for `@cf/meta/llama-3.1-8b-instruct-fp8-fast` in Cloudflare's docs and record its maximum context in tokens in `docs/spikes/s0-accounts.md`. **Decision rule:** if it is below ~40,000 tokens, the paste-all baseline (≈35k tokens of docs) cannot run on this model; Task 15 then runs paste-all on a long-context free model (Gemini Flash free) and the report must say the model differs.
 
-- [ ] **Step 6: Create the exhaustion test (run once, at the end of a day)**
+- [x] **Step 6: Create the exhaustion test (run once, at the end of a day)** (attempted 3x; wall not reached, see s0-accounts.md)
 
 `spikes/s0_exhaust.py`:
 ```python

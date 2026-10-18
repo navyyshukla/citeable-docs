@@ -137,7 +137,20 @@ So the forum reports were right. A run of 100 questions with one answer call and
 
 Rule that follows: Gemini free content is used by Google to improve its products, so nothing from real users is ever sent to Gemini.
 
+## Exhaustion test (Step 6): attempted three times, wall NOT reached (2026-10-18)
+
+| Run | Calls | Neurons counted | Ended because |
+|---|---|---|---|
+| 1 | 283 | 3,811 | one read timeout (script flaw, fixed) |
+| 2 | 193 | 2,612 | 8 retried read timeouts |
+| 3 | 42 | 559 | 60-minute time cap; 4 timeouts |
+
+- **No non-200 response was ever seen.** After every run chat (same model), embedding and a second chat model (gemma-4) all still returned HTTP 200. About 7,000 of the 10,000 daily neurons were counted as spent, so the limit was not reached.
+- **Finding: throughput, not quota, was the limit.** Cloudflare handled only about 0.13-0.16 calls/s for 700-token answers regardless of 4, 6 or 8 workers, and run 3 slowed to 42 calls in 87 minutes. Treat the free tier as slow under sustained load: size the eval runner for it (small batches, long timeouts, retry on timeout) and show a "still working" state in the UI.
+- **Still unknown:** the exact error code and message when the daily allowance runs out, and whether anything is charged. Until measured, the adapter must treat ANY non-200 as "fall back to the next provider" and never assume the message text. The dashboard shows no charge so far (owner to confirm).
+- The test can be repeated on a fresh day with a cheaper pattern (short prompts, embedding calls) only if the answer matters before Plan 2; otherwise we learn it from the first real occurrence, which the adapter handles by falling back.
+
 ## Still to record
 - [x] Context window of the chat model (Step 5), see above
-- [ ] Exhaustion behavior (Step 6)
+- [x] Exhaustion behavior (Step 6): **attempted, quota wall not reached**, see below
 - [ ] Gemini and Groq limits, two fallback models, training-use terms (Step 7)
