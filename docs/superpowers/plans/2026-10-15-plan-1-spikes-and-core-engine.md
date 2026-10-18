@@ -606,7 +606,7 @@ git push -u origin main
 ```
 (The repo contains the spec and decision log, which are written for readers.)
 
-- [ ] **Step 3: Deploy on Render**
+- [x] **Step 3: Deploy on Render**
 
 Render dashboard → New → Web Service → connect the repo. Settings: Root Directory `spikes/s4_coldstart`, Runtime Python, Build `pip install -r requirements.txt`, Start `uvicorn main:app --host 0.0.0.0 --port $PORT`, Instance type **Free**, **no payment method**. Record the build time.
 
