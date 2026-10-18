@@ -72,3 +72,8 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - Rule: Gemini free tier lets Google use content to improve products, so no real user question goes to Gemini.
 - Open: eval answers on Gemini describe Gemini's answers, not Cloudflare's. Decide in Plan 2.
 - Open: the answering model for users (planned id is deprecated). Decide at Task 5.
+
+## Owner understanding checks (2026-10-19)
+- **Neuron:** Cloudflare's billing unit for compute, not a token. Tokens in and out are converted to neurons at a per-model rate. Free allowance 10,000 neurons/day; the model choice sets how many questions fit.
+- **Exhaustion test:** its purpose is to learn what happens when the allowance runs out (error code, message, any charge, whether other models still work) so the adapter falls back safely. Attempted 3 times; the wall was not reached because Cloudflare's speed limited us first. The adapter treats any non-200 as "fall back".
+- **Why ingest `stable`:** it matched the published headings on 2 of 3 pages and is what released VisiData ships with; `develop` has unreleased features that users may not have. The published site is slightly ahead of `stable`; pinning a tag stays open for Task 5.
