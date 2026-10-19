@@ -1446,7 +1446,7 @@ git commit -m "feat(ingest): fetch docs tarball and build pieces with urls and v
 - Consumes: `Piece` (Task 9).
 - Produces: `Store(dsn: str, dim: int)` with `init_schema() -> None`, `replace_project_pieces(project: str, pieces: list[Piece], embeddings: list[list[float]]) -> None`, `load_pieces(project: str) -> list[Piece]`, `vector_search(project: str, embedding: list[float], k: int) -> list[tuple[str, float]]` (piece id, cosine similarity; higher is better).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/test_store.py`:
 ```python
@@ -1502,12 +1502,12 @@ def test_embedding_count_must_match_pieces():
         store.replace_project_pieces("t", [piece("p:0", "x")], [])
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `set -a && source .env && set +a && pytest tests/test_store.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.store'` (or SKIPPED if the env var is missing; set it).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `app/store.py`:
 ```python
@@ -1585,12 +1585,12 @@ class Store:
 ```
 Note: `ORDER BY id` is lexical (`join:10` before `join:2`); it is only used for stable loading, not ranking.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `set -a && source .env && set +a && pytest tests/test_store.py -v`
 Expected: 3 passed. (Use the Neon `test` branch URL; these tests create/delete rows in the `pieces` table of that branch only.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/store.py tests/test_store.py
