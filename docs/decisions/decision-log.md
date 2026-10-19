@@ -22,7 +22,7 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - Alternatives: single provider; 1 main + 4-5 fallbacks; local model for tests.
 - Why: free limits change (Gemini Pro left free tier Apr 2026 per a roundup); every answering model must be scored (5 models = 5x eval cost); a local model measures a different model than users get; judge from another family avoids self-preference bias.
 - Facts: Cloudflare Workers AI 10,000 neurons/day free (verified); OpenRouter :free 20 req/min, 50/day under $10 credits (verified, excluded); Gemini/Groq limits visible only in account.
-- Unverified: Cloudflare behavior when allocation is exhausted.
+- Unverified: Cloudflare behavior when allocation is exhausted (still unknown after S0; see D14, D15).
 
 ## D5. Launch: public unofficial beta in week 2 with caps
 - Alternatives: public only after polish; beta week 1.
@@ -77,3 +77,11 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - **Neuron:** Cloudflare's billing unit for compute, not a token. Tokens in and out are converted to neurons at a per-model rate. Free allowance 10,000 neurons/day; the model choice sets how many questions fit.
 - **Exhaustion test:** its purpose is to learn what happens when the allowance runs out (error code, message, any charge, whether other models still work) so the adapter falls back safely. Attempted 3 times; the wall was not reached because Cloudflare's speed limited us first. The adapter treats any non-200 as "fall back".
 - **Why ingest `stable`:** it matched the published headings on 2 of 3 pages and is what released VisiData ships with; `develop` has unreleased features that users may not have. The published site is slightly ahead of `stable`; pinning a tag stays open for Task 5.
+
+## D15. Answering model and second fallback (decided at the Task 5 gate, 2026-10-19)
+- Main: Cloudflare `gemma-4-26b-a4b-it` (256k context, so paste-all can run; S5: 11/11 on a tiny set, about 20 neurons/question short, about 38 with 5 full pieces; S5b found it obeyed an instruction hidden in a doc piece, so the output check must block non-allowlisted links). Fallback 1: Groq `openai/gpt-oss-20b` (D14). Fallback 2: Cloudflare `llama-3.1-8b-instruct-fp8`.
+- Alternatives for fallback 2: another Groq model (same provider as fallback 1, separate bucket unconfirmed); no second fallback.
+- Owner's reason: it is not a thinking model, so it does not hit the empty-answer problem that gemma can hit; when gemma returns no answer the chain moves on and still gets one.
+- Claude's note: the fallback re-answers the same question from scratch, it does not continue gemma's output. It shares Cloudflare's neuron pool, so it covers a gemma failure but not a quota-out; Groq is the quota-out safety net. Its 32k context is enough for the real pipeline (about 3k tokens in) but not for paste-all.
+- Adapter rules from S5: `max_tokens` about 3,000 because reasoning tokens count toward it; an empty or length-stopped answer counts as a failure and moves to the next provider; any non-200 moves on.
+- Open: the answering model's quality is only checked on 11 questions; the real dev set in Task 15 is the real test. Eval answers on Gemini describe Gemini, not Cloudflare (decide in Plan 2).

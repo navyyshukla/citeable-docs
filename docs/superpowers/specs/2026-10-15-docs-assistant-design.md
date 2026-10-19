@@ -74,18 +74,18 @@ Core is **thin, hand-written Python**. Libraries only for commodity parts (Markd
 
 ## 7. Data and ingestion
 
-- **Source:** VisiData repo, `stable` branch or release tag. **Not `develop`** (develop was observed ahead of the published site).
+- **Source:** VisiData repo, **`stable` branch** (confirmed at S1: matches the published headings on 2 of 3 pages; one section behind on `columns`; 13 of 32 files differ from `develop`). Release tag `v3.4` is the reproducible alternative. **Not `develop`.** Citation anchors may occasionally not exist on the published page.
 - **Cleaning:** strip front-matter, HTML/JS blocks (demo players), template placeholders (e.g. `{help.commands.…}`); keep tables together with their header row.
 - **Cutting:** by headings, keeping the heading path ("Columns › How to format columns › …"); very long sections get a second split.
 - **Per piece we store:** text, page URL, heading path + anchor, docs version, "last updated", embedding.
 - **Anchors:** some headings have custom ids (`{#expand}`); anchor generation must handle both.
 - **Staleness:** pages show their last-updated/version; answers display it and flag old pages (e.g. written for v2.x while current is v3.4).
-- **Open item:** the command reference ("man page") may hold many "what does key X do" answers. v1 = docs only; revisit after the first eval run.
+- **Open item:** there is no ready-made command-reference file (S1). Candidates: `visidata/man/vd.inc`, `docs/api/commands.rst`, `visidata/guides/*.md`; published man page at visidata.org/man/. Inline `{help.*}` placeholders in list items must be stripped too. v1 = docs only; revisit after the first eval run.
 
 ## 8. Search
 
 - Four modes behind one switch; **measured, then the winner is kept**: paste-all baseline (~35k tokens, run once and cached), keyword, meaning (embeddings), hybrid (fusion).
-- **Symbol-safe keyword path required:** single-key commands (`&`, `!`, `(`, `=`) must be findable; default tokenizers/full-text search probably drop punctuation (unverified → spike).
+- **Symbol-safe keyword path required** (measured at S2, 9 queries: word-only 8/9, symbol-aware 7/9, symbol-aware plus exact backticked-key path with a definition-row boost 9/9). **Ships: symbol-aware tokenizer plus the exact key path.** Small, partly tuned set; to be re-measured on the real eval set.
 - Embedding model chosen by a **retrieval-only test** (does the right piece appear in the top 5?), not by price. Model name lives in config; changing it means re-embedding (cheap here).
 
 ## 9. Answer behavior and safety
@@ -110,10 +110,10 @@ Privacy and licensing notes are practical, not legal advice.
 
 - Adapter with ordered providers: **1 main + 2 fallbacks** for answering, plus **1 judge from a different model family** that never answers users.
 - **Every model that can answer users is scored** on the same test set.
-- Main candidate: Cloudflare Workers AI. Fallback candidates: Gemini free, Groq free (limits visible only in the user's account; not guaranteed). Specific models set after checking the accounts.
+- **Chain for users (D14, D15):** main Cloudflare `gemma-4-26b-a4b-it`; fallback 1 Groq `openai/gpt-oss-20b` (`reasoning_effort: low`; 1,000 requests/day and 8k tokens/min measured); fallback 2 Cloudflare `llama-3.1-8b-instruct-fp8` (non-reasoning, 32k context; shares Cloudflare's neuron pool, so it covers a Gemma failure, not a quota-out). Tests and judge: Gemini `gemini-3.5-flash-lite` on public data only (free tier lets Google train on content; no user question ever goes to Gemini).
 - **Free quota facts (verified from official pages, 2026-10-14/15):** Cloudflare Workers AI 10,000 neurons/day free, resets 00:00 UTC; OpenRouter `:free` = 20 req/min, 50/day (1,000/day only after buying ≥$10 credits → excluded); Gemini and Groq free limits not published in docs.
-- **Estimates (not measurements):** ~23 neurons/question for an 8B model with 3k tokens in / 300 out → ~430 questions/day; paste-all ≈ 155 neurons. Log **model calls per question** and fail CI if ≠ 1.
-- **Unverified:** behavior when the Cloudflare free allocation is exhausted (error vs charge) — confirm before the first large test run.
+- **Measured (S5/S5b):** gemma-4 about 20 neurons/question with 3 short pieces (11 questions) and about 38 (28-73) with 5 full pieces (8 calls) → plan on about 250 questions per 10k; reasoning tokens hide inside `completion_tokens`, so use `max_tokens` about 3,000 and treat an empty or length-stopped answer as a failure → next provider. **Estimate:** paste-all (35k tokens) about 326 neurons on gemma-4. Log **model calls per question** (one per provider tried) and the real `usage.neurons`.
+- **Exhaustion (S0, 3 attempts):** the wall was not reached (throughput of about 0.15 calls/s was the limit, not quota); dashboard showed 7.16k of 10k neurons used, no charge. The error code is still unknown, so the adapter treats ANY non-200 as "try the next provider". Free Cloudflare is slow under sustained load: small eval batches, long timeouts, retries.
 - Stay on Free plans; add no payment method.
 - Cloud-only evals (a local model measures a different model than users get). A local model is optional for "does it run" smoke tests only.
 
@@ -150,7 +150,7 @@ Next.js (App Router, TypeScript), **static export** (`output: 'export'`) hosted 
 
 | Part | Choice | Verified terms | Weakness |
 |---|---|---|---|
-| API | Render free web service | spins down after 15 min idle, ~1 min wake, 750 free hrs/mo; no card → suspended not billed | cold start |
+| API | Render free web service | spins down after 15 min idle, 750 free hrs/mo; no card → suspended not billed. **Measured (S4):** 0.1 CPU, 512 MB RAM; cold start 24.2 / 21.8 / 21.8 s; 72 MB peak for our dependencies only (floor, not the app's cost) | cold start; 0.1 CPU slows start-up work, so load lazily; pin the Python version (Render default is 3.14.8) |
 | DB | Neon free | 1 GB, 100 CU-hrs, suspends after 5 min idle, pgvector included, no card | idle latency |
 | Frontend | GitHub Pages | free | — |
 | CI | GitHub Actions | free for public repos | eval runs use AI quota |
@@ -192,12 +192,13 @@ Our code: **MIT**. No copies of VisiData docs committed. Decision log: one file 
 
 ## 17. Open items, spikes and risks
 
-Spikes (before locking §7/§8):
-1. Compare `stable` Markdown vs published pages for 3 pages; locate the command reference.
-2. Symbol queries ("what does & do?") under each search mode.
-3. Mine past issues/Discussions: how many have a clear maintainer answer?
-4. Cold-start and memory on Render free with our dependencies.
+Spikes (all done 2026-10-19; results in `docs/spikes/`):
+1. [x] `stable` vs published pages; command reference located (candidates only). S1.
+2. [x] Symbol queries: symbol-aware tokenizer plus exact key path. S2.
+3. [x] Past questions: viable (115 labelled issues and 164 answered discussions, counts not quality). S3.
+4. [x] Render cold start and memory: proceed. S4.
+5. [x] Gemma-4 quality check: 11/11 on a tiny set, not a quality score. S5.
 
-Risks (in order): getting any real usage; judge reliability; free-tier changes; capacity (TypeScript + Python + evals); stale or incomplete docs; Cloudflare quota-exhaustion behavior unverified.
+Risks (in order): getting any real usage; judge reliability; free-tier changes; capacity (TypeScript + Python + evals); stale or incomplete docs; Cloudflare quota-exhaustion error unknown (handled by falling back on any non-200).
 
 Open decisions: which two fallback models; embedding model (by retrieval test); evidence threshold (by dev set); exact caps; retention period.
