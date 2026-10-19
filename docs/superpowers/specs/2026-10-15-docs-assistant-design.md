@@ -114,6 +114,8 @@ Privacy and licensing notes are practical, not legal advice.
 - **Free quota facts (verified from official pages, 2026-10-14/15):** Cloudflare Workers AI 10,000 neurons/day free, resets 00:00 UTC; OpenRouter `:free` = 20 req/min, 50/day (1,000/day only after buying ≥$10 credits → excluded); Gemini and Groq free limits not published in docs.
 - **Measured (S5/S5b):** gemma-4 about 20 neurons/question with 3 short pieces (11 questions) and about 38 (28-73) with 5 full pieces (8 calls) → plan on about 250 questions per 10k; reasoning tokens hide inside `completion_tokens`, so use `max_tokens` about 3,000 and treat an empty or length-stopped answer as a failure → next provider. **Estimate:** paste-all (35k tokens) about 326 neurons on gemma-4. Log **model calls per question** (one per provider tried) and the real `usage.neurons`.
 - **Exhaustion (S0, 3 attempts):** the wall was not reached (throughput of about 0.15 calls/s was the limit, not quota); dashboard showed 7.16k of 10k neurons used, no charge. The error code is still unknown, so the adapter treats ANY non-200 as "try the next provider". Free Cloudflare is slow under sustained load: small eval batches, long timeouts, retries.
+- **Thinking (S10, D17):** gemma-4 runs with thinking off by default (57% fewer neurons, 5x faster); the output check must require a citation of a piece we sent, or the abstention marker, because thinking off is easier to talk out of the rules (3/3 against 0/3).
+- **Not used, on purpose (D16):** provider prompt caching, a semantic cache, Redis, Kafka; an exact-match answer cache comes in Plan 2 if the beta shows repeats.
 - Stay on Free plans; add no payment method.
 - Cloud-only evals (a local model measures a different model than users get). A local model is optional for "does it run" smoke tests only.
 
@@ -157,6 +159,7 @@ Next.js (App Router, TypeScript), **static export** (`output: 'export'`) hosted 
 | Tracing | own Postgres tables (v1); Langfuse Hobby optional later | Hobby: 50k units/mo, 30-day retention, 2 users | 30-day history |
 
 Rejected: Hugging Face Spaces (Docker/Gradio need a paid plan), Render free Postgres (expires after 30 days), Supabase free (pauses after 1 week idle; pgvector unconfirmed).
+Regions: Neon is in us-east-2 (Ohio); the spike Render service is in Oregon; the real API goes in Ohio (D16). Use a connection pool (a new connection cost about 1.5 s from the laptop, S9).
 Cold start handling: friendly UI state first; a keep-alive ping (~720 of 750 hrs) only if real use justifies it.
 
 ## 14. Repo layout and licensing
