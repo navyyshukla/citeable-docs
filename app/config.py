@@ -1,10 +1,16 @@
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class ProjectCfg(BaseModel):
+class _Strict(BaseModel):
+    """Unknown or misspelled keys are an error, never silently ignored."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ProjectCfg(_Strict):
     name: str
     slug: str
     upstream_repo: str
@@ -15,13 +21,13 @@ class ProjectCfg(BaseModel):
     issues_url: str
 
 
-class SearchCfg(BaseModel):
+class SearchCfg(_Strict):
     top_k: int = 5
     rrf_k: int = 60
     evidence_threshold: float = 0.0
 
 
-class LimitsCfg(BaseModel):
+class LimitsCfg(_Strict):
     max_question_chars: int = 500
     max_answer_tokens: int = 400
     max_completion_tokens: int = 3000
@@ -29,7 +35,7 @@ class LimitsCfg(BaseModel):
     per_visitor_daily_cap: int = 10
 
 
-class ModelsCfg(BaseModel):
+class ModelsCfg(_Strict):
     embedding: str
     embedding_dim: int
     embedding_batch: int = 20
@@ -37,7 +43,7 @@ class ModelsCfg(BaseModel):
     neurons_per_m_tokens: dict[str, tuple[float, float]] = Field(default_factory=dict)
 
 
-class Config(BaseModel):
+class Config(_Strict):
     project: ProjectCfg
     search: SearchCfg = SearchCfg()
     limits: LimitsCfg = LimitsCfg()

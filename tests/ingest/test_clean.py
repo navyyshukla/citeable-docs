@@ -102,6 +102,26 @@ def test_markdown_table_separator_row_is_kept():
     assert "|---|---|" in clean_markdown(table).body
 
 
+def test_updated_and_date_keys_are_read_as_last_updated():
+    # real pages: customize, graphics, menu, ... use "Updated:"; viewtsv uses "Date:"
+    assert clean_markdown("---\nUpdated: 2018-03-01\n---\ntext\n").last_updated == "2018-03-01"
+    assert clean_markdown("---\nDate: 2017-12-27\n---\ntext\n").last_updated == "2017-12-27"
+
+
+def test_unclosed_demo_block_does_not_delete_later_sections():
+    raw = (
+        '## A\n\n<div class="asciicast">\n<script>x</script>\n\n## B\n\nimportant text b\n\n'
+        '<div class="note">tip</div>\n\n## C\n\nkept\n'
+    )
+    body = clean_markdown(raw).body
+    assert "important text b" in body and "## B" in body and "kept" in body
+
+
+def test_self_closing_tag_inside_demo_block_is_not_counted_as_an_opening():
+    raw = '<div class="asciicast" id="x"><div id="player"/></div>\n\n## B\n\nlost?\n\n<div>n</div>\n'
+    assert "lost?" in clean_markdown(raw).body
+
+
 STABLE = Path(__file__).resolve().parents[2] / "spikes" / ".cache" / "stable.tar.gz"
 
 
@@ -119,3 +139,17 @@ def test_real_docs_have_no_noise_left_after_cleaning():
                 if bad in body:
                     left.append((parts[2], bad))
     assert left == []
+
+
+@pytest.mark.skipif(not STABLE.exists(), reason="docs cache not present (it is gitignored)")
+def test_real_pages_that_use_updated_or_date_keep_their_date():
+    wanted = {"customize", "graphics", "menu", "navigate", "plugins", "save-restore", "viewtsv"}
+    got = {}
+    with tarfile.open(STABLE) as tf:
+        for m in tf:
+            parts = m.name.split("/", 2)
+            if m.isfile() and len(parts) == 3 and parts[1] == "docs" and parts[2][:-3] in wanted:
+                got[parts[2][:-3]] = clean_markdown(
+                    tf.extractfile(m).read().decode("utf-8", "replace")).last_updated
+    assert set(got) == wanted
+    assert all(got.values()), got

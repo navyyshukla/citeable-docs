@@ -21,3 +21,14 @@ def test_pricing_table_values_are_input_output_pairs():
     cfg = load_config(CONFIG)
     for model, (inp, out) in cfg.models.neurons_per_m_tokens.items():
         assert inp > 0 and out > 0, model
+
+
+def test_misspelled_key_is_an_error_not_silently_ignored(tmp_path):
+    import pytest
+    from pydantic import ValidationError
+
+    bad = CONFIG.read_text(encoding="utf-8").replace("max_question_chars", "max_question_char")
+    path = tmp_path / "bad.yaml"
+    path.write_text(bad, encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_config(path)

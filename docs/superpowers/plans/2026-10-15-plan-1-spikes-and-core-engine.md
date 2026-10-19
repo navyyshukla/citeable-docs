@@ -1436,6 +1436,8 @@ git commit -m "feat(ingest): fetch docs tarball and build pieces with urls and v
 
 ## Task 10: Postgres + pgvector store
 
+> **Note from the cold review of Tasks 6-9 (2026-10-19):** `Piece` now has `anchor_explicit: bool` (Task 9 ruling, spike S7: only headings written with their own `{#id}` exist on the published site, so only those become `#anchor` citation links). **The store must carry it:** add `anchor_explicit BOOLEAN NOT NULL DEFAULT FALSE` to the schema, the insert and the select, build `Piece(..., anchor_explicit=...)` in `load_pieces`, and add a test that saves a piece with `anchor_explicit=True` and reloads it with the same value and the same `citation_url`. Without this, every deep link silently becomes a page-only citation once pieces come from the database. Also: piece ids are `<page>:<n>` by position and shift when upstream edits a page; do not store them long-term (feedback, logs) in Plan 2.
+
 **Files:**
 - Create: `app/store.py`
 - Test: `tests/test_store.py` (needs `TEST_DATABASE_URL`; skipped otherwise)
@@ -2668,6 +2670,8 @@ git commit -m "feat(evals): schema, retrieval and answer runners, budget stop, r
 ---
 
 ## Task 15: CLI glue, first ingest, dev set and baseline report
+
+> **Note from the cold review of Tasks 6-9 (2026-10-19):** `fetch_docs` now raises on a download over the size limit or when no markdown is found, but `cmd_ingest` must also guard `replace_project_pieces`: refuse to replace when `build_pieces` returns fewer than a minimum (use half of the current stored count, and at least 100; the real docs give about 230). An empty or tiny result must never delete the stored pieces. Add a test for it.
 
 **Files:**
 - Create: `app/cli.py`, `evals/data/dev.jsonl`, `docs/evals/baseline-<date>.md`

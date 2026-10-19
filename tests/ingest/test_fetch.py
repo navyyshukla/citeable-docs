@@ -61,3 +61,39 @@ def test_http_error_is_raised_not_swallowed():
     client = _client(lambda request: httpx.Response(404))
     with pytest.raises(httpx.HTTPStatusError):
         fetch_docs("saulpw/visidata", "no-such-ref", "docs", client=client)
+
+
+def test_content_length_over_the_limit_is_refused_before_reading_the_body():
+    read = []
+
+    def body():
+        read.append(1)
+        yield b"x" * 10
+
+    client = _client(lambda request: httpx.Response(
+        200, headers={"content-length": "999999999"}, content=body()))
+    with pytest.raises(ValueError, match="too large"):
+        fetch_docs("saulpw/visidata", "stable", "docs", client=client, max_bytes=1000)
+    assert read == []
+
+
+def test_streamed_body_without_content_length_is_cut_off_at_the_limit():
+    def body():
+        for _ in range(100):
+            yield b"x" * 100
+
+    client = _client(lambda request: httpx.Response(200, content=body()))
+    with pytest.raises(ValueError, match="too large"):
+        fetch_docs("saulpw/visidata", "stable", "docs", client=client, max_bytes=1000)
+
+
+def test_a_huge_markdown_member_is_skipped():
+    tar = make_tar({"r/docs/small.md": b"## S\nok\n", "r/docs/huge.md": b"a" * 6_000_000})
+    assert set(_docs_from_tarball(tar, "docs")) == {"small.md"}
+
+
+def test_no_markdown_found_is_an_error_not_an_empty_result():
+    # a wrong docs_path or a moved folder must not look like "zero pages"
+    client = _client(lambda request: httpx.Response(200, content=TAR))
+    with pytest.raises(ValueError, match="no markdown"):
+        fetch_docs("saulpw/visidata", "stable", "no-such-folder", client=client)

@@ -25,19 +25,23 @@ class CleanDoc:
 
 
 def _front_value(block: str, key: str) -> str | None:
-    m = re.search(rf"^\s*{key}\s*:\s*(.+?)\s*$", block, re.MULTILINE | re.IGNORECASE)
+    m = re.search(rf"^\s*(?:{key})\s*:\s*(.+?)\s*$", block, re.MULTILINE | re.IGNORECASE)
     return m.group(1).strip().strip("'\"") if m else None
 
 
 def _drop_demo_blocks(text: str) -> str:
-    """Remove each demo block through its matching close tag (counts nested tags of the same name)."""
+    """Remove each demo block through its matching close tag (counts nested tags of the same name).
+    If the block never closes, only its opening tag is removed: never delete text we cannot bound."""
     while m := _DEMO_OPEN.search(text):
         tag, depth, pos = m.group(1).lower(), 1, m.end()
         tags = re.compile(rf"<(/?){tag}\b[^>]*>", re.IGNORECASE)
         while depth and (t := tags.search(text, pos)):
-            depth += -1 if t.group(1) else 1
+            if t.group(1):
+                depth -= 1
+            elif not t.group(0).endswith("/>"):  # a self-closing tag opens nothing
+                depth += 1
             pos = t.end()
-        text = text[: m.start()] + text[pos:]
+        text = text[: m.start()] + text[pos if depth == 0 else m.end():]
     return text
 
 
@@ -45,7 +49,7 @@ def clean_markdown(raw: str) -> CleanDoc:
     last_updated = docs_version = None
     m = _FRONT.match(raw)
     if m:
-        last_updated = _front_value(m.group(1), "update")
+        last_updated = _front_value(m.group(1), "updated?|date")
         docs_version = _front_value(m.group(1), "version")
         raw = raw[m.end():]
     raw = _SCRIPT.sub("", raw)
