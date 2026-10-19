@@ -2384,7 +2384,7 @@ git commit -m "feat(answer): prompts, abstention, output link allowlist, paste-a
   - `AnswerRow(id, mode, answerable, status, abstained_correctly: bool | None, invalid_citations: int, llm_calls: int, neurons: float | None, seconds: float | None)`; `run_answers(questions, searcher, pieces_by_id, adapter, cfg, project_name, mode, k, max_neurons) -> tuple[list[AnswerRow], bool]` (second value: stopped early because the neuron budget was reached)
   - `summarize_retrieval(rows) -> dict`, `summarize_answers(rows) -> dict`, `write_results(path: Path, meta: dict, retrieval: dict[str, list[RetrievalRow]], answers: dict[str, list[AnswerRow]]) -> None`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/evals/test_schema.py`:
 ```python
@@ -2505,12 +2505,12 @@ def test_write_results_is_valid_json(tmp_path):
 ```
 Also create empty `tests/evals/__init__.py`.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/evals -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'evals.schema'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `evals/schema.py`:
 ```python
@@ -2653,12 +2653,12 @@ def write_results(path: Path, meta: dict, retrieval: dict[str, list[RetrievalRow
     Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/evals -v`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add evals tests/evals
