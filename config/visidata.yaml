@@ -1,0 +1,31 @@
+project:
+  name: VisiData
+  slug: visidata
+  upstream_repo: saulpw/visidata
+  ref: stable
+  docs_path: docs
+  site_base_url: https://www.visidata.org/docs
+  license_note: "Unofficial. Answers are generated from VisiData's documentation; VisiData is licensed GPLv3."
+  issues_url: https://github.com/saulpw/visidata/issues
+search:
+  top_k: 5
+  rrf_k: 60
+  evidence_threshold: 0.0
+limits:
+  max_question_chars: 500
+  max_answer_tokens: 400
+  max_completion_tokens: 3000
+  global_daily_cap: 150
+  per_visitor_daily_cap: 10
+models:
+  embedding: "@cf/baai/bge-base-en-v1.5"
+  embedding_dim: 768
+  embedding_batch: 20
+  answer_order:
+    - "cloudflare:@cf/google/gemma-4-26b-a4b-it"
+    - "groq:openai/gpt-oss-20b"
+    - "cloudflare:@cf/meta/llama-3.1-8b-instruct-fp8"
+  # Cloudflare neurons per million tokens: [input, output]. Groq is not billed in neurons.
+  neurons_per_m_tokens:
+    "@cf/google/gemma-4-26b-a4b-it": [9091, 27273]
+    "@cf/meta/llama-3.1-8b-instruct-fp8": [13778, 26128]
