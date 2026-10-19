@@ -882,7 +882,7 @@ git commit -m "feat: scaffold project, typed config and CI"
 **Interfaces:**
 - Produces: `CleanDoc(body: str, last_updated: str | None, docs_version: str | None)` and `clean_markdown(raw: str) -> CleanDoc`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/ingest/test_clean.py`:
 ```python
@@ -942,12 +942,12 @@ def test_empty_file_and_no_front_matter():
 ```
 Also create empty `tests/ingest/__init__.py`.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/ingest/test_clean.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ingest.clean'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ingest/clean.py`:
 ```python
@@ -990,12 +990,12 @@ def clean_markdown(raw: str) -> CleanDoc:
     return CleanDoc(raw, last_updated, docs_version)
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/ingest/test_clean.py -v`
 Expected: 4 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ingest/clean.py tests/ingest
