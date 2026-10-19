@@ -86,6 +86,7 @@ Core is **thin, hand-written Python**. Libraries only for commodity parts (Markd
 
 - Four modes behind one switch; **measured, then the winner is kept**: paste-all baseline (~35k tokens, run once and cached), keyword, meaning (embeddings), hybrid (fusion).
 - **Symbol-safe keyword path required** (measured at S2, 9 queries: word-only 8/9, symbol-aware 7/9, symbol-aware plus exact backticked-key path with a definition-row boost 9/9). **Ships: symbol-aware tokenizer plus the exact key path.** Small, partly tuned set; to be re-measured on the real eval set.
+- **Vector index (S11, D16):** `search.vector_index: none | hnsw`, default `none` (exact search: under 1 ms at 229 pieces, 35 ms at 14,000). HNSW is about 100x faster from 5,000 pieces up; with several projects in one table it needs `hnsw.ef_search` 100 and iterative scan set per query with `SET LOCAL` (Neon's pooler shares sessions). Measured on synthetic data only.
 - Embedding model chosen by a **retrieval-only test** (does the right piece appear in the top 5?), not by price. Model name lives in config; changing it means re-embedding (cheap here).
 
 ## 9. Answer behavior and safety

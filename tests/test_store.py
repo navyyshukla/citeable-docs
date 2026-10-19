@@ -20,6 +20,7 @@ def clean_rows():
             exists = c.execute("SELECT to_regclass('public.pieces')").fetchone()[0]
             if exists:
                 c.execute("DELETE FROM pieces WHERE project = ANY(%s)", (list(PROJECTS),))
+            c.execute("DROP INDEX IF EXISTS pieces_embedding_hnsw")
     wipe()
     yield
     wipe()
@@ -126,3 +127,36 @@ def test_init_schema_refuses_a_table_with_a_different_vector_size():
     Store(DSN, dim=4).init_schema()
     with pytest.raises(ValueError, match="dimension"):
         Store(DSN, dim=8).init_schema()
+
+
+def _index_exists() -> bool:
+    with psycopg.connect(DSN) as c:
+        return c.execute(
+            "SELECT 1 FROM pg_indexes WHERE indexname = 'pieces_embedding_hnsw'").fetchone() is not None
+
+
+def test_hnsw_index_is_created_idempotently_and_dropped_when_switched_off():
+    Store(DSN, dim=4, vector_index="hnsw").init_schema()
+    Store(DSN, dim=4, vector_index="hnsw").init_schema()  # second run must not fail
+    assert _index_exists()
+    Store(DSN, dim=4, vector_index="none").init_schema()
+    assert not _index_exists()
+
+
+def test_search_with_an_hnsw_index_matches_exact_search():
+    exact = Store(DSN, dim=4)
+    exact.init_schema()
+    pieces = [piece(f"p:{i}", f"t{i}") for i in range(6)]
+    embs = [[1.0, 0.1 * i, 0.0, 0.0] for i in range(6)]
+    exact.replace_project_pieces("a", pieces, embs)
+    exact.replace_project_pieces("b", [piece("q:0", "other")], [[1.0, 0.0, 0.0, 0.0]])
+    want = exact.vector_search("a", [1.0, 0.0, 0.0, 0.0], k=4)
+    ann = Store(DSN, dim=4, vector_index="hnsw")
+    ann.init_schema()
+    got = ann.vector_search("a", [1.0, 0.0, 0.0, 0.0], k=4)  # runs the per-query index settings
+    assert [i for i, _ in got] == [i for i, _ in want] and len(got) == 4
+
+
+def test_unknown_index_kind_is_rejected():
+    with pytest.raises(ValueError, match="vector_index"):
+        Store(DSN, dim=4, vector_index="ivfflat")

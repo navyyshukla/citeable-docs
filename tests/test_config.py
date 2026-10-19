@@ -40,3 +40,15 @@ def test_misspelled_key_is_an_error_not_silently_ignored(tmp_path):
     path.write_text(bad, encoding="utf-8")
     with pytest.raises(ValidationError):
         load_config(path)
+
+
+def test_vector_index_setting_defaults_to_none_and_rejects_unknown_kinds(tmp_path):
+    import pytest
+    from pydantic import ValidationError
+
+    assert load_config(CONFIG).search.vector_index == "none"
+    text = CONFIG.read_text(encoding="utf-8").replace("vector_index: none", "vector_index: ivfflat")
+    path = tmp_path / "bad.yaml"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_config(path)

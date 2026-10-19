@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,6 +28,9 @@ class SearchCfg(_Strict):
     top_k: int = 5
     rrf_k: int = 60
     evidence_threshold: float = 0.0
+    # "none": exact vector search (fast for thousands of pieces); "hnsw": approximate index for
+    # large docs sets. Measured in spike S11: exact is 35 ms at 14k pieces, the index 0.3 ms.
+    vector_index: Literal["none", "hnsw"] = "none"
 
 
 class LimitsCfg(_Strict):

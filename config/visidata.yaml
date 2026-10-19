@@ -14,6 +14,7 @@ search:
   top_k: 5
   rrf_k: 60
   evidence_threshold: 0.0
+  vector_index: none
 limits:
   max_question_chars: 500
   max_answer_tokens: 400
