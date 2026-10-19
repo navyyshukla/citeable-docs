@@ -1929,7 +1929,7 @@ git commit -m "feat(llm): provider adapter with fallback, Cloudflare provider an
 - Produces: `tokenize_words`, `tokenize_symbols`, `Bm25(docs: dict[str, str], tokenize=tokenize_symbols, k1=1.5, b=0.75)` with `search(query, k=5) -> list[tuple[str, float]]`, `rrf(rankings: list[list[str]], k: int = 60) -> list[tuple[str, float]]`, `Hit(piece_id: str, score: float)`, `Searcher(pieces, embed_query=None, vector_search=None, rrf_k=60)` with `search(mode, query, k=5) -> list[Hit]` where mode ∈ `"keyword" | "meaning" | "hybrid"`.
 - Uses the tokenizer choice confirmed in Task 2 (symbol-aware by default).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/test_search.py`:
 ```python
@@ -1992,12 +1992,12 @@ def test_meaning_mode_requires_embeddings_and_unknown_mode_fails():
         s.search("telepathy", "x", 3)
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/test_search.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.search'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `app/search.py`:
 ```python
@@ -2090,12 +2090,12 @@ class Searcher:
         return [Hit(i, s) for i, s in fused[:k]]
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/test_search.py -v`
 Expected: 6 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/search.py tests/test_search.py
