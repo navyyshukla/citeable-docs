@@ -36,7 +36,10 @@ class SearchCfg(_Strict):
 class LimitsCfg(_Strict):
     max_question_chars: int = 500
     max_answer_tokens: int = 400
+    # Request cap where hidden thinking counts toward it (gemma with thinking on, gpt-oss).
     max_completion_tokens: int = 3000
+    # Request cap for gemma with thinking off: the longest answer in spike S10 was 351 tokens.
+    max_completion_tokens_no_thinking: int = 1000
     global_daily_cap: int = 150
     per_visitor_daily_cap: int = 10
 
@@ -47,6 +50,10 @@ class ModelsCfg(_Strict):
     embedding_batch: int = 20
     answer_order: list[str]
     neurons_per_m_tokens: dict[str, tuple[float, float]] = Field(default_factory=dict)
+    # Cloudflare models with a thinking switch: model -> enable_thinking (D17: gemma off).
+    thinking: dict[str, bool] = Field(default_factory=dict)
+    # Models that do not think: capped at limits.max_answer_tokens, the visible-answer budget.
+    non_reasoning: list[str] = Field(default_factory=list)
 
 
 class Config(_Strict):
