@@ -98,3 +98,9 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - Cost: easier to talk out of the rules by the user's own question (3/3 followed against 0/3). Defence in code, not in the model: an answer is accepted only if it cites a piece we sent or is exactly `NOT_IN_DOCS` (Task 13). The hidden-link weakness exists in both modes and is covered by the link allowlist.
 - Alternatives: thinking on (default; slower, costlier, more empty answers); thinking on only as a fallback after a failure.
 - **Confirmed by the owner (2026-10-19):** thinking off is the default because the numbers back it ("if the tests show thinking off is better then yes it should be the default as it is backed by the numbers"). Condition kept: the numbers come from 15 questions, so the Task 15 dev set re-checks quality, and the default flips back if it shows worse answers.
+
+## D18. Task 15 baseline answers use the user chain, not Gemini (2026-10-19)
+- Decision (owner): no Gemini in Task 15. The baseline answers run on the user chain (Cloudflare gemma, then Groq, then Cloudflare llama) under `--max-neurons`, before any beta traffic.
+- Why (assistant's reasoning, owner gave no separate reason): the baseline should measure the answers users get; Gemini answers would describe Gemini. Resolves the open item in D14/D15 for Task 15. Gemini stays for the AI judge in Plan 2, on public data only.
+- Alternative rejected: build a Gemini provider and run the baseline there (more code, measures the wrong model).
+- Cost if wrong: the baseline spends up to 1,500 neurons of the 10,000/day free allocation.
