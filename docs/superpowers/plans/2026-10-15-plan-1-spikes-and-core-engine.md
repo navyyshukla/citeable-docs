@@ -684,7 +684,7 @@ git commit -m "docs: record spike outcomes and update spec and decisions"
 **Interfaces:**
 - Produces: `Config`, `ProjectCfg`, `SearchCfg`, `LimitsCfg`, `ModelsCfg`, `load_config(path) -> Config`. All later tasks import these names exactly.
 
-- [ ] **Step 1: Create `pyproject.toml`**
+- [x] **Step 1: Create `pyproject.toml`**
 
 ```toml
 [build-system]
@@ -716,7 +716,7 @@ testpaths = ["tests"]
 line-length = 100
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `tests/test_config.py`:
 ```python
@@ -745,12 +745,12 @@ def test_pricing_table_values_are_input_output_pairs():
         assert inp > 0 and out > 0, model
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
+- [x] **Step 3: Run it to verify it fails**
 
 Run: `pip install -e ".[dev]" && pytest tests/test_config.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.config'`.
 
-- [ ] **Step 4: Create config and loader**
+- [x] **Step 4: Create config and loader**
 
 `config/visidata.yaml` (replace `ref`, `embedding_dim` and fallbacks with the confirmed values from Task 5):
 ```yaml
@@ -835,12 +835,12 @@ def load_config(path: Path | str) -> Config:
 ```
 Create empty `app/__init__.py`, `ingest/__init__.py`, `evals/__init__.py`, `app/llm/__init__.py`, `tests/__init__.py`.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `pytest tests/test_config.py -v`
 Expected: 3 passed.
 
-- [ ] **Step 6: Add CI**
+- [x] **Step 6: Add CI**
 
 `.github/workflows/ci.yml`:
 ```yaml
@@ -860,7 +860,7 @@ jobs:
 ```
 CI has no secrets and makes no AI calls.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pyproject.toml config app ingest evals tests .github
