@@ -15,6 +15,7 @@ class RawPiece:
     heading_path: tuple[str, ...]
     anchor: str
     text: str
+    anchor_explicit: bool = False  # heading had its own {#id}; only those exist on the site
 
 
 def slugify(title: str) -> str:
@@ -74,16 +75,17 @@ def _pack(paragraphs: list[str], max_chars: int) -> list[str]:
 
 
 def chunk_markdown(doc: str, page_title: str, max_chars: int = 1500) -> list[RawPiece]:
-    sections: list[tuple[tuple[str, ...], str, list[str]]] = []
+    sections: list[tuple[tuple[str, ...], str, bool, list[str]]] = []
     stack: list[tuple[int, str]] = []
     path: tuple[str, ...] = (page_title,)
     anchor = ""
+    explicit = False
     buf: list[str] = []
     in_fence = False
 
     def flush() -> None:
         if "".join(buf).strip():
-            sections.append((path, anchor, buf.copy()))
+            sections.append((path, anchor, explicit, buf.copy()))
         buf.clear()
 
     for line in doc.splitlines():
@@ -94,6 +96,7 @@ def chunk_markdown(doc: str, page_title: str, max_chars: int = 1500) -> list[Raw
             flush()
             level = len(m.group(1))
             title, anchor = parse_heading(m.group(2))
+            explicit = bool(_CUSTOM_ID.search(m.group(2)))
             while stack and stack[-1][0] >= level:
                 stack.pop()
             stack.append((level, title))
@@ -103,7 +106,7 @@ def chunk_markdown(doc: str, page_title: str, max_chars: int = 1500) -> list[Raw
     flush()
 
     pieces: list[RawPiece] = []
-    for sec_path, sec_anchor, lines in sections:
+    for sec_path, sec_anchor, sec_explicit, lines in sections:
         for group in _pack(_split_paragraphs("\n".join(lines)), max_chars):
-            pieces.append(RawPiece(sec_path, sec_anchor, group))
+            pieces.append(RawPiece(sec_path, sec_anchor, group, sec_explicit))
     return pieces

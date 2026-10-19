@@ -44,6 +44,14 @@ def test_parse_heading_strips_bold_markup():
         "How to format month/day/year dates", "how-to-format-monthdayyear-dates")
 
 
+def test_only_explicit_ids_are_marked_explicit():
+    # the published site has ids only on headings written with {#id} (spike S7)
+    doc = "## Plain heading\n\ntext\n\n## [Expand](#expand) {#expand}\n\nmore\n"
+    plain, custom = chunk_markdown(doc, "Columns")
+    assert (plain.anchor, plain.anchor_explicit) == ("plain-heading", False)
+    assert (custom.anchor, custom.anchor_explicit) == ("expand", True)
+
+
 def test_paths_and_nesting():
     paths = [p.heading_path for p in chunk_markdown(DOC, "Columns", max_chars=60)]
     assert ("Columns", "How to format columns") in paths

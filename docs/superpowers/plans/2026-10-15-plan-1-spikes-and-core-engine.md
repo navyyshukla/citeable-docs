@@ -1213,7 +1213,7 @@ git commit -m "feat(ingest): cut markdown by headings with path and anchors"
   - `fetch_docs(repo: str, ref: str, docs_path: str, client: httpx.Client | None = None, max_bytes: int = 400_000_000) -> dict[str, str]`
   - `build_pieces(files: dict[str, str], cfg: ProjectCfg) -> list[Piece]`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/ingest/test_fetch.py`:
 ```python
@@ -1310,12 +1310,12 @@ def test_search_text_includes_heading_path():
     assert join.search_text.startswith("Join › How to join")
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/ingest -v`
 Expected: FAIL — `ModuleNotFoundError` for `ingest.fetch` / `ingest.pipeline`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ingest/models.py`:
 ```python
@@ -1418,12 +1418,12 @@ def build_pieces(files: dict[str, str], cfg: ProjectCfg) -> list[Piece]:
     return pieces
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/ingest -v`
 Expected: all pass (clean 4, chunk 8, fetch 3, pipeline 4).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ingest tests/ingest
