@@ -1621,7 +1621,7 @@ git commit -m "feat(store): postgres + pgvector storage with project-scoped repl
   - `build_adapter(cfg: Config, env: Mapping[str, str], client: httpx.Client | None = None) -> Adapter`
 - Parsing assumes the shapes confirmed in Task 0 (`result.response`, `result.usage.prompt_tokens/completion_tokens`, embeddings at `result.data`). If Task 0 found different keys, change `_parse_chat`/`embed_texts` and the fixtures in the tests below to match before Step 3.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/llm/test_adapter.py`:
 ```python
@@ -1752,12 +1752,12 @@ def test_build_adapter_from_config_and_rejects_unknown_provider(tmp_path):
 ```
 Also create empty `tests/llm/__init__.py`.
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/llm -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.llm.base'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `app/llm/base.py`:
 ```python
@@ -1898,12 +1898,12 @@ def build_adapter(cfg: Config, env: Mapping[str, str],
     return Adapter(providers)
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/llm -v`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/llm tests/llm
