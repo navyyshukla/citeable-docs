@@ -91,7 +91,7 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - **Render region: Ohio** for the real API (Plan 2), next to Neon (us-east-2). The spike service is in Oregon (read from the owner's dashboard); Oregon to Ohio is an estimated 50-70 ms per round trip, small next to the 22 s cold start and multi-second answers. Alternatives: move the database to Oregon; leave it.
 - **Speed and token savings:** provider prompt caching is not worth building (spike S10 maths: input is 15-25% of a question's neurons and only the 60-token system prompt is identical across questions). The levers are answer-side: thinking off (D17), then an exact-match answer cache in Postgres and streaming in Plan 2 once the beta shows repeat rates. Semantic cache rejected for v1 (can return a wrong answer to a different question).
 - **Kafka and Redis: rejected.** Nothing streams (one service, about 150 questions a day, ingest by hand) and one instance needs no shared memory; rate limits and the answer cache fit in Postgres. Trigger to revisit Redis: several API instances that must share rate limits or cache, or Postgres counters becoming a bottleneck. Trigger for Kafka: ingest becomes an event stream from many sources with replay and many consumers.
-- Owner's reasons: picked the recommended option for each; one-sentence reasons still to be given.
+- Owner's reason (2026-10-19): keep it simple, and change a choice only if the numbers say otherwise.
 
 ## D17. gemma-4 runs with thinking off by default (spike S10, 2026-10-19)
 - Thinking off: 15/15 on the check against 13/15, 57% fewer neurons (205 against 475), 5x faster in total (48 s against 247 s), no empty or cut-off answers. Setting: `chat_template_kwargs.enable_thinking: false` (Cloudflare schema).
