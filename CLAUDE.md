@@ -22,5 +22,6 @@ Key findings so far (details in `docs/spikes/s0-accounts.md`, `s1-sources.md`): 
 - Push back with reasoning when the owner's choice looks wrong; do not just agree. Separate verified facts from estimates.
 - Hard rules: everything free; assistant has no tools and no private data; never commit copies of VisiData docs; project specifics live in `config/`; tests run on a different provider bucket than users.
 - Do not use the Context MCP (`mcp__context__*`): its free quota is exhausted. Use WebSearch, WebFetch, exa, GitHub tools.
+- After every task (and spike): report in simple language with text diagrams: what the task was, what is next, where we stand, and what needs a second opinion, another run or another test (even if nothing).
 - Outward-facing actions (posting, emailing, contacting maintainers) only with explicit owner approval.
 - Usage economy: one focused task per session, reference files by path, avoid broad research fan-out, spawn subagents only when asked or clearly worth it.
