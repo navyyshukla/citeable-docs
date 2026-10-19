@@ -19,6 +19,8 @@ class ProjectCfg(_Strict):
     site_base_url: str
     license_note: str
     issues_url: str
+    skip_files: list[str] = Field(default_factory=lambda: ["README.md"])
+    max_piece_chars: int = 1500
 
 
 class SearchCfg(_Strict):

@@ -13,8 +13,16 @@ def test_loads_visidata_config():
     assert cfg.models.answer_order, "at least the main model must be configured"
 
 
-def test_never_ingests_develop_branch():
-    assert load_config(CONFIG).project.ref != "develop"
+def test_ingests_only_stable_or_a_release_tag():
+    import re
+
+    ref = load_config(CONFIG).project.ref
+    assert ref == "stable" or re.fullmatch(r"v\d+(\.\d+)*", ref), ref
+
+
+def test_ingest_settings_live_in_config():
+    cfg = load_config(CONFIG).project
+    assert cfg.skip_files == ["README.md"] and cfg.max_piece_chars == 1500
 
 
 def test_pricing_table_values_are_input_output_pairs():

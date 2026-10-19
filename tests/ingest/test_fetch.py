@@ -97,3 +97,8 @@ def test_no_markdown_found_is_an_error_not_an_empty_result():
     client = _client(lambda request: httpx.Response(200, content=TAR))
     with pytest.raises(ValueError, match="no markdown"):
         fetch_docs("saulpw/visidata", "stable", "no-such-folder", client=client)
+
+
+def test_utf8_bom_is_dropped():
+    tar = make_tar({"r/docs/a.md": b"\xef\xbb\xbf---\nUpdate: 2020-01-01\n---\ntext\n"})
+    assert _docs_from_tarball(tar, "docs")["a.md"].startswith("---")

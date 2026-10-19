@@ -2,12 +2,16 @@
 import re
 from dataclasses import dataclass
 
-_HEADING = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*$")
+from ingest.fences import fence_mask
+
+_HEADING = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.+?)[ \t]*$")
+_SETEXT_UNDERLINE = re.compile(r"^ {0,3}(=+|-{2,})[ \t]*$")
+_CLOSING_HASHES = re.compile(r"[ \t]+#+[ \t]*$")
 _CUSTOM_ID = re.compile(r"\s*\{#([A-Za-z0-9_-]+)\}\s*$")
 _MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _BOLD = re.compile(r"(\*\*|__)(.+?)\1")
 _TABLE_RULE = re.compile(r"^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*$")
-_FENCE = re.compile(r"^[ \t]*(```|~~~)")
+_NOT_A_SETEXT_TEXT = re.compile(r"^\s*(#|[-*+>|]|\d+[.)]|<)")
 
 
 @dataclass(frozen=True)
@@ -26,6 +30,7 @@ def slugify(title: str) -> str:
 def parse_heading(raw: str) -> tuple[str, str]:
     """Return (clean title, anchor id) for the text after the #'s."""
     anchor = ""
+    raw = _CLOSING_HASHES.sub("", raw)
     m = _CUSTOM_ID.search(raw)
     if m:
         anchor = m.group(1)
@@ -34,8 +39,41 @@ def parse_heading(raw: str) -> tuple[str, str]:
     return title, anchor or slugify(title)
 
 
+def _setext_to_atx(lines: list[str]) -> list[str]:
+    """Turn `Title` over `=====` or `-----` into `# Title` / `## Title` (outside code blocks)."""
+    mask = fence_mask(lines)
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        is_text = lines[i].strip() and not _NOT_A_SETEXT_TEXT.match(lines[i])
+        starts_paragraph = i == 0 or not lines[i - 1].strip()
+        underline = _SETEXT_UNDERLINE.match(nxt)
+        if (is_text and starts_paragraph and underline and not mask[i] and not mask[i + 1]
+                and "|" not in lines[i]):  # a pipe in the line above means a table header
+            out.append(("# " if underline.group(1).startswith("=") else "## ") + lines[i].strip())
+            i += 2
+        else:
+            out.append(lines[i])
+            i += 1
+    return out
+
+
 def _split_paragraphs(body: str) -> list[str]:
-    return [p for p in re.split(r"\n\s*\n", body.strip()) if p.strip()]
+    """Split on blank lines, except inside fenced code (a code block is one paragraph)."""
+    lines = body.strip().split("\n")
+    paragraphs: list[str] = []
+    cur: list[str] = []
+    for line, in_code in zip(lines, fence_mask(lines), strict=True):
+        if not in_code and not line.strip():
+            if cur:
+                paragraphs.append("\n".join(cur))
+                cur = []
+        else:
+            cur.append(line)
+    if cur:
+        paragraphs.append("\n".join(cur))
+    return [p for p in paragraphs if p.strip()]
 
 
 def _split_wide_table(paragraph: str, max_chars: int) -> list[str]:
@@ -75,38 +113,44 @@ def _pack(paragraphs: list[str], max_chars: int) -> list[str]:
 
 
 def chunk_markdown(doc: str, page_title: str, max_chars: int = 1500) -> list[RawPiece]:
+    lines = _setext_to_atx(doc.splitlines())
+    mask = fence_mask(lines)
     sections: list[tuple[tuple[str, ...], str, bool, list[str]]] = []
     stack: list[tuple[int, str]] = []
     path: tuple[str, ...] = (page_title,)
     anchor = ""
     explicit = False
     buf: list[str] = []
-    in_fence = False
+    last_heading: tuple[int, str] | None = None  # (level, original line) of the latest heading
+    carried: list[str] = []  # headings with no body, kept as the first lines of the next piece
 
     def flush() -> None:
         if "".join(buf).strip():
-            sections.append((path, anchor, explicit, buf.copy()))
+            sections.append((path, anchor, explicit, [*carried, *([""] if carried else []), *buf]))
+            carried.clear()
         buf.clear()
 
-    for line in doc.splitlines():
-        if _FENCE.match(line):
-            in_fence = not in_fence
-        m = None if in_fence else _HEADING.match(line)
+    for line, in_code in zip(lines, mask, strict=True):
+        m = None if in_code else _HEADING.match(line)
         if m:
-            flush()
             level = len(m.group(1))
+            had_body = bool("".join(buf).strip())
+            if not had_body and last_heading and last_heading[0] >= level:
+                carried.append(last_heading[1])  # empty heading above a sibling or a higher one
+            flush()
             title, anchor = parse_heading(m.group(2))
-            explicit = bool(_CUSTOM_ID.search(m.group(2)))
+            explicit = bool(_CUSTOM_ID.search(_CLOSING_HASHES.sub("", m.group(2))))
             while stack and stack[-1][0] >= level:
                 stack.pop()
             stack.append((level, title))
             path = (page_title, *[t for _, t in stack])
+            last_heading = (level, line.strip())
         else:
             buf.append(line)
     flush()
 
     pieces: list[RawPiece] = []
-    for sec_path, sec_anchor, sec_explicit, lines in sections:
-        for group in _pack(_split_paragraphs("\n".join(lines)), max_chars):
+    for sec_path, sec_anchor, sec_explicit, sec_lines in sections:
+        for group in _pack(_split_paragraphs("\n".join(sec_lines)), max_chars):
             pieces.append(RawPiece(sec_path, sec_anchor, group, sec_explicit))
     return pieces

@@ -7,6 +7,9 @@ project:
   site_base_url: https://www.visidata.org/docs
   license_note: "Unofficial. Answers are generated from VisiData's documentation; VisiData is licensed GPLv3."
   issues_url: https://github.com/saulpw/visidata/issues
+  skip_files:
+    - README.md
+  max_piece_chars: 1500
 search:
   top_k: 5
   rrf_k: 60

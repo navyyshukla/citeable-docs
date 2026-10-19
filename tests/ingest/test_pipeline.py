@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -53,6 +54,41 @@ def test_explicit_heading_id_is_cited_as_a_deep_link():
     assert p.citation_url == "https://www.visidata.org/docs/columns/#expand"
 
 
+def test_urls_are_percent_encoded_and_empty_stems_skipped():
+    pieces = build_pieces({"My Doc.md": "## T\n\ntext\n", ".md": "## T\n\ntext\n"}, CFG)
+    assert [p.page_slug for p in pieces] == ["My Doc"]
+    assert pieces[0].url == "https://www.visidata.org/docs/My%20Doc/"
+
+
+def test_page_title_comes_from_front_matter_when_present():
+    files = {"join.md": "---\neleventyNavigation:\n  key: Combining datasets\n---\n## A\n\ntext\n",
+             "save-restore.md": "## A\n\ntext\n"}
+    by_slug = {p.page_slug: p for p in build_pieces(files, CFG)}
+    assert by_slug["join"].page_title == "Combining datasets"
+    assert by_slug["join"].heading_path[0] == "Combining datasets"
+    assert by_slug["save-restore"].page_title == "Save Restore"
+
+
+def test_skip_list_and_piece_size_come_from_config():
+    cfg = CFG.model_copy(update={"skip_files": ["skipme.md"], "max_piece_chars": 60})
+    files = {"skipme.md": "## A\n\ntext\n", "README.md": "## R\n\nkept now\n",
+             "big.md": "## B\n\n" + "\n\n".join(["word " * 8] * 6) + "\n"}
+    pieces = build_pieces(files, cfg)
+    assert {p.page_slug for p in pieces} == {"README", "big"}
+    assert len([p for p in pieces if p.page_slug == "big"]) > 1
+
+
+def test_relative_links_become_absolute_and_images_are_dropped():
+    text = ("See [customize](/docs/customize) and [other](other-page) and [sec](#sec) and "
+            "[ext](https://example.org/x). ![](assets/a.png) ![alt words](assets/b.png)\n")
+    (p,) = build_pieces({"join.md": "## A\n\n" + text}, CFG)
+    assert "(https://www.visidata.org/docs/customize)" in p.text
+    assert "(https://www.visidata.org/docs/join/other-page)" in p.text
+    assert "(https://www.visidata.org/docs/join/#sec)" in p.text
+    assert "(https://example.org/x)" in p.text
+    assert "assets/a.png" not in p.text and "assets/b.png" not in p.text and "alt words" in p.text
+
+
 def test_piece_without_anchor_cites_the_page_url():
     p = next(iter(build_pieces({"mouse.md": "plain text, no headings\n"}, CFG)))
     assert p.anchor == "" and p.citation_url == "https://www.visidata.org/docs/mouse/"
@@ -69,5 +105,6 @@ def test_real_docs_build_unique_well_formed_pieces():
     ids = [p.id for p in pieces]
     assert len(ids) == len(set(ids)) and len(pieces) > 150
     assert all(p.text.strip() and p.url.startswith("https://www.visidata.org/docs/") for p in pieces)
-    assert all(" " not in p.citation_url for p in pieces)
+    shape = re.compile(r"^https://www\.visidata\.org/docs/([A-Za-z0-9._~%-]+/)?(#[A-Za-z0-9_-]+)?$")
+    assert all(shape.match(p.citation_url) for p in pieces)
     assert {p.docs_ref for p in pieces} == {"stable"}

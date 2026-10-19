@@ -122,6 +122,48 @@ def test_self_closing_tag_inside_demo_block_is_not_counted_as_an_opening():
     assert "lost?" in clean_markdown(raw).body
 
 
+def test_crlf_bom_and_missing_final_newline_do_not_break_front_matter():
+    raw = "\ufeff---\r\nUpdate: 2020-10-27\r\nVersion: VisiData 2.0.1\r\n---\r\n## T\r\ntext\r\n"
+    d = clean_markdown(raw)
+    assert (d.last_updated, d.docs_version) == ("2020-10-27", "VisiData 2.0.1")
+    assert "Update:" not in d.body and "\r" not in d.body
+    assert clean_markdown("---\nUpdate: 2021-01-01\n---").last_updated == "2021-01-01"
+
+
+def test_a_leading_horizontal_rule_is_not_front_matter():
+    raw = "---\nIntro paragraph kept.\n\n---\n\n## T\n\ntext\n"
+    assert "Intro paragraph kept." in clean_markdown(raw).body
+
+
+def test_code_blocks_are_left_alone():
+    raw = (
+        "## Example\n\n```yaml\n---\nkey: 1\n---\n```\n\n"
+        "~~~\n{help.commands.x}\n<br/>\n~~~\n\ntext\n"
+    )
+    body = clean_markdown(raw).body
+    assert "```yaml\n---\nkey: 1\n---\n```" in body
+    assert "{help.commands.x}" in body and "<br/>" in body
+
+
+def test_demo_block_class_variants_are_removed():
+    for tag in ("<div class='asciicast'>", '<div class="asciicast wide">'):
+        raw = f"before\n\n{tag}\n<asciinema-player src='x'></asciinema-player>\n</div>\n\nafter\n"
+        body = clean_markdown(raw).body
+        assert "asciinema" not in body and "</div>" not in body
+        assert "before" in body and "after" in body
+
+
+def test_setext_underline_is_not_removed_as_a_rule():
+    body = clean_markdown("Title\n---\ntext\n").body
+    assert "Title\n---\ntext" in body
+
+
+def test_title_comes_from_front_matter_navigation_key():
+    raw = "---\neleventyNavigation:\n  key: Combining datasets\nUpdate: 2020-10-27\n---\n## A\ntext\n"
+    assert clean_markdown(raw).title == "Combining datasets"
+    assert clean_markdown("## A\ntext\n").title is None
+
+
 STABLE = Path(__file__).resolve().parents[2] / "spikes" / ".cache" / "stable.tar.gz"
 
 

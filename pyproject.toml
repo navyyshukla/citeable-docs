@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest==9.1.1", "ruff==0.17.1"]
 
 [tool.setuptools.packages.find]
 include = ["app*", "ingest*", "evals*"]
@@ -26,3 +26,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 extend-exclude = ["spikes"]
+
+[tool.ruff.lint]
+# explicit, so a new ruff release cannot switch on rules and break CI
+select = ["E4", "E7", "E9", "F", "RUF015", "FURB167"]

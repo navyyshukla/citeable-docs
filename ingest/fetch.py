@@ -21,7 +21,7 @@ def _docs_from_tarball(data: bytes, docs_path: str,
                 continue
             f = tf.extractfile(member)
             if f is not None:
-                out[name] = f.read().decode("utf-8", errors="replace")
+                out[name] = f.read().decode("utf-8-sig", errors="replace")
     return out
 
 

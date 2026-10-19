@@ -52,6 +52,49 @@ def test_only_explicit_ids_are_marked_explicit():
     assert (custom.anchor, custom.anchor_explicit) == ("expand", True)
 
 
+def test_heading_without_body_before_a_sibling_is_kept_in_the_next_piece():
+    # real case: docs/group.md has a heading with no text directly above a sibling heading
+    pieces = chunk_markdown("## A title with words\n\n## B\n\ntext\n", "P")
+    assert len(pieces) == 1 and pieces[0].heading_path == ("P", "B")
+    assert "A title with words" in pieces[0].text
+
+
+def test_heading_without_body_above_a_child_is_not_repeated():
+    pieces = chunk_markdown("## A\n\n### A1\n\ntext\n", "P")
+    assert len(pieces) == 1 and pieces[0].heading_path == ("P", "A", "A1")
+    assert pieces[0].text.strip() == "text"
+
+
+def test_fence_rules_follow_the_opening_fence():
+    doc = "## A\n\n~~~\n```\n## x\n```\n~~~\n\n````\n```\n## inner\n```\n````\n\n## B\n\ntext\n"
+    paths = [p.heading_path for p in chunk_markdown(doc, "P")]
+    assert ("P", "B") in paths
+    assert ("P", "x") not in paths and ("P", "inner") not in paths and ("P", "A", "x") not in paths
+
+
+def test_unclosed_fence_does_not_swallow_later_headings():
+    doc = "## A\n\n```\ncode never closed\n\n## B\n\ntext b\n"
+    assert ("P", "B") in [p.heading_path for p in chunk_markdown(doc, "P")]
+
+
+def test_fenced_code_with_blank_lines_stays_in_one_piece():
+    code = "```\n" + "\n\n".join(f"line {i} " + "x" * 40 for i in range(12)) + "\n```"
+    pieces = chunk_markdown(f"## A\n\n{code}\n", "P", max_chars=200)
+    holder = [p for p in pieces if "line 0" in p.text]
+    assert len(holder) == 1 and "line 11" in holder[0].text
+
+
+def test_closing_hashes_indent_and_setext_headings():
+    assert parse_heading("Title ##") == ("Title", "title")
+    doc = "   ## Indented\n\ntext one\n\nSetext title\n------------\n\ntext two\n"
+    paths = [p.heading_path for p in chunk_markdown(doc, "P")]
+    assert ("P", "Indented") in paths and ("P", "Setext title") in paths
+
+
+def test_backticks_stay_in_heading_titles():
+    assert parse_heading("How to use `=` for columns")[0] == "How to use `=` for columns"
+
+
 def test_paths_and_nesting():
     paths = [p.heading_path for p in chunk_markdown(DOC, "Columns", max_chars=60)]
     assert ("Columns", "How to format columns") in paths
