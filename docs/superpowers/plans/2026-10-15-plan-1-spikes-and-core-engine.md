@@ -2119,7 +2119,7 @@ git commit -m "feat(search): symbol-aware BM25, rank fusion and search modes"
 - Produces: `Citation(n: int, title: str, url: str, docs_version: str | None, last_updated: str | None)`; `Answer(status: str, text: str, citations: list[Citation], closest: list[Citation], provider: str | None, model: str | None, neurons: float | None, llm_calls: int, seconds: float | None, top_score: float | None, invalid_citations: list[int])`; `check_output(text: str, allowed_urls: set[str]) -> str`; `answer_question(question, hits, pieces_by_id, adapter, cfg, project_name) -> Answer`; `answer_paste_all(question, pieces, adapter, cfg, project_name) -> Answer`; constants `NOT_FOUND_TEXT`.
 - `status` is `"answered"` or `"abstained"`. Invalid questions raise `ValueError` (the API layer in Plan 2 maps that to HTTP 400).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/test_answer.py`:
 ```python
@@ -2219,12 +2219,12 @@ def test_check_output_keeps_allowed_links_only():
     assert "docs/join/" in out and "evil.com" not in out and "b" in out
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/test_answer.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.answer'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `app/answer.py`:
 ```python
@@ -2353,12 +2353,12 @@ def answer_paste_all(question: str, pieces: list[Piece], adapter: Adapter, cfg: 
 ```
 In `test_abstention_variants...`, the "closest" list is the retrieved pieces the model saw (first 3); numbering is 1..n.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/test_answer.py -v`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/answer.py tests/test_answer.py
