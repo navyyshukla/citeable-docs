@@ -1016,7 +1016,7 @@ git commit -m "feat(ingest): clean docs markdown (front matter, noise)"
 - Consumes: cleaned Markdown body from Task 7.
 - Produces: `RawPiece(heading_path: tuple[str, ...], anchor: str, text: str)`; `chunk_markdown(doc: str, page_title: str, max_chars: int = 1500) -> list[RawPiece]`; `parse_heading(raw: str) -> tuple[str, str]`; `slugify(title: str) -> str`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/ingest/test_chunk.py`:
 ```python
@@ -1086,12 +1086,12 @@ def test_heading_with_empty_body_is_skipped():
     assert chunk_markdown("## Only a heading\n", "P") == []
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `pytest tests/ingest/test_chunk.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ingest.chunk'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ingest/chunk.py`:
 ```python
@@ -1184,12 +1184,12 @@ def chunk_markdown(doc: str, page_title: str, max_chars: int = 1500) -> list[Raw
     return pieces
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `pytest tests/ingest/test_chunk.py -v`
 Expected: 8 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ingest/chunk.py tests/ingest/test_chunk.py
