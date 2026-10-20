@@ -1,5 +1,6 @@
 """Commands: ingest docs into the database; run evals."""
 import argparse
+import json
 import os
 import sys
 from collections import Counter
@@ -13,9 +14,10 @@ from app.llm.build import build_adapter
 from app.llm.cloudflare import CloudflareClient, embed_texts
 from app.search import Searcher
 from app.store import Store
-from evals.runner import (run_answers, run_retrieval, summarize_answers, summarize_retrieval,
+from evals.runner import (RetrievalRow, run_answers, run_retrieval, summarize_answers, summarize_retrieval,
                           write_results)
 from evals.schema import load_questions
+from evals.threshold import threshold_table
 from ingest.fetch import fetch_docs_and_commit
 from ingest.pipeline import build_pieces
 
@@ -118,6 +120,26 @@ def cmd_eval(args) -> int:
     return 0
 
 
+def cmd_calibrate(args) -> int:
+    """Print what each evidence threshold would do. Reads a saved file: no network, no neurons."""
+    data = json.loads(Path(args.retrieval).read_text(encoding="utf-8"))
+    if args.mode not in data["retrieval"]:
+        print(f"mode {args.mode!r} not in {args.retrieval} (has {sorted(data['retrieval'])})",
+              file=sys.stderr)
+        return 1
+    rows = [RetrievalRow(**r) for r in data["retrieval"][args.mode]]
+    # Candidate thresholds: each distinct best score seen, plus 0 (answer everything).
+    best = sorted({max(r.top_scores) for r in rows if r.top_scores})
+    table = threshold_table(rows, [0.0] + best)
+    print(f"{'threshold':>10} {'answered%':>10} {'wrong%':>8} {'abstain_ok%':>12}")
+    for t in table:
+        def fmt(x):
+            return "-" if x is None else f"{x:.0f}"
+        print(f"{t.threshold:>10.4f} {t.answered_pct:>10.0f} {fmt(t.wrong_when_answered_pct):>8} "
+              f"{fmt(t.correctly_abstained_pct):>12}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="app.cli")
     p.add_argument("--config", default="config/visidata.yaml")
@@ -135,8 +157,12 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--max-neurons", type=float, default=1500.0)
     e.add_argument("--out", required=True)
     e.add_argument("--config", default=argparse.SUPPRESS)
+    c = sub.add_parser("calibrate")
+    c.add_argument("--retrieval", required=True)
+    c.add_argument("--mode", default="hybrid")
+    c.add_argument("--config", default=argparse.SUPPRESS)
     args = p.parse_args(argv)
-    return cmd_ingest(args) if args.cmd == "ingest" else cmd_eval(args)
+    return {"ingest": cmd_ingest, "eval": cmd_eval, "calibrate": cmd_calibrate}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -154,3 +154,24 @@ def test_pieces_are_stored_with_the_docs_commit_in_docs_ref(monkeypatch):
     monkeypatch.setattr("app.cli.build_pieces", build)
     assert main(["ingest"]) == 0
     assert seen["ref"] == "stable@abcdef0123"
+
+
+def test_calibrate_prints_a_table_without_touching_network_or_database(tmp_path, capsys):
+    import json
+    rows = [{"id": "a", "mode": "hybrid", "answerable": True, "hit": True, "top_ids": ["x"],
+             "top_scores": [0.033], "error": None},
+            {"id": "b", "mode": "hybrid", "answerable": False, "hit": None, "top_ids": ["x"],
+             "top_scores": [0.012], "error": None}]
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps({"meta": {}, "retrieval": {"hybrid": rows}}))
+    assert main(["calibrate", "--retrieval", str(f), "--mode", "hybrid"]) == 0
+    out = capsys.readouterr().out
+    assert "threshold" in out and "answered%" in out and "0.0330" in out
+
+
+def test_calibrate_unknown_mode_fails_cleanly(tmp_path, capsys):
+    import json
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps({"meta": {}, "retrieval": {"hybrid": []}}))
+    assert main(["calibrate", "--retrieval", str(f), "--mode", "nope"]) == 1
+    assert "nope" in capsys.readouterr().err

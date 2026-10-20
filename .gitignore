@@ -7,3 +7,4 @@ __pycache__/
 spikes/.cache/
 *.egg-info/
 .superpowers/
+evals/results/
