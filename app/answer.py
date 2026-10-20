@@ -1,6 +1,7 @@
 """Build prompts, call the model through the adapter, enforce the output rules."""
 import re
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 from app.config import Config
 from app.llm.base import Adapter
@@ -10,9 +11,16 @@ from ingest.models import Piece
 NOT_FOUND_TEXT = "I couldn't find this in the VisiData docs."
 _NOT_FOUND = re.compile(r"^\W*not[_ ]found\b", re.IGNORECASE)
 _CITE = re.compile(r"\[(\d+)\]")
-_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_IMAGE = re.compile(r"!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])")  # inline and reference-style
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
-_BARE_URL = re.compile(r"https?://[^\s)\]>]+")
+# A reference definition line: "[r]: https://target "title"". It is a link even with no text.
+_REF_DEF = re.compile(r"^[ \t]{0,3}\[[^\]\n]+\]:[ \t]*<?([^\s>]+)>?.*$", re.MULTILINE)
+# http(s) URLs in any letter case, and scheme-relative "//host.tld/..." (not "C://x" or "a//b").
+_BARE_URL = re.compile(r"https?://[^\s)\]>]+|(?<![\w:/.])//[\w-]+(?:\.[\w-]+)+[^\s)\]>]*",
+                       re.IGNORECASE)
+# Tags that load or link something. Other angle-bracket text such as <Tab> is left alone.
+_HTML_TAG = re.compile(r"</?(?:a|img|iframe|script|style|link|form|object|embed|svg|video|audio|"
+                       r"source|meta|base|input|button|math)\b[^>]*>?", re.IGNORECASE)
 _WWW = re.compile(r"(?<![\w@/.])www\.[^\s)\]>]+", re.IGNORECASE)
 _TRAILING = ".,;:!?'\""
 
@@ -61,18 +69,29 @@ def check_output(text: str, allowed_urls: set[str]) -> str:
 
     This, not the prompt, is the defence against a doc piece telling the model to add a link.
     """
+    text = _HTML_TAG.sub("", text)
     text = _IMAGE.sub("", text)
+    text = _REF_DEF.sub(lambda m: m.group(0) if m.group(1).rstrip(_TRAILING) in allowed_urls
+                        else "", text)
     text = _LINK.sub(lambda m: m.group(0) if m.group(2) in allowed_urls else m.group(1), text)
     text = _BARE_URL.sub(lambda m: m.group(0) if m.group(0).rstrip(_TRAILING) in allowed_urls
                          else "", text)
     return _WWW.sub("", text).strip()
 
 
+def _on_site(url: str, site: str) -> bool:
+    """Same scheme and host as the site, and inside its path (not a look-alike host)."""
+    u, b = urlsplit(url), urlsplit(site)
+    base = b.path.rstrip("/")
+    return (u.scheme.lower() == b.scheme.lower() and u.netloc.lower() == b.netloc.lower()
+            and (not base or u.path == base or u.path.startswith(base + "/")))
+
+
 def _citation(n: int, p: Piece) -> Citation:
     return Citation(n, " › ".join(p.heading_path), p.citation_url, p.docs_version, p.last_updated)
 
 
-def _validate_question(question: str, cfg: Config) -> str:
+def validate_question(question: str, cfg: Config) -> str:
     q = question.strip()
     if not q:
         raise ValueError("question is empty")
@@ -108,7 +127,7 @@ def _answer_from(question: str, excerpts: list[Piece], adapter: Adapter, cfg: Co
     # carry any link it likes (S5b), so a link to somewhere else never passes.
     site = cfg.project.site_base_url
     for p in excerpts:
-        allowed |= {u for u in _urls_in(p.text) if u.startswith(site)}
+        allowed |= {u for u in _urls_in(p.text) if _on_site(u, site)}
     return Answer("answered", check_output(c.text, allowed),
                   citations=[_citation(n, excerpts[n - 1]) for n in valid],
                   invalid_citations=invalid, **meta)
@@ -116,7 +135,7 @@ def _answer_from(question: str, excerpts: list[Piece], adapter: Adapter, cfg: Co
 
 def answer_question(question: str, hits: list[Hit], pieces_by_id: dict[str, Piece],
                     adapter: Adapter, cfg: Config, project_name: str) -> Answer:
-    q = _validate_question(question, cfg)
+    q = validate_question(question, cfg)
     kept = [(h, pieces_by_id[h.piece_id]) for h in hits if h.piece_id in pieces_by_id]
     if not kept:
         return Answer("abstained", NOT_FOUND_TEXT, llm_calls=0)
@@ -125,5 +144,5 @@ def answer_question(question: str, hits: list[Hit], pieces_by_id: dict[str, Piec
 
 def answer_paste_all(question: str, pieces: list[Piece], adapter: Adapter, cfg: Config,
                      project_name: str) -> Answer:
-    q = _validate_question(question, cfg)
+    q = validate_question(question, cfg)
     return _answer_from(q, pieces, adapter, cfg, project_name, None)

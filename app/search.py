@@ -9,11 +9,22 @@ from ingest.models import Piece
 
 _TOKEN = re.compile(r"[A-Za-z0-9_]+|[^\sA-Za-z0-9_]")
 _WORD = re.compile(r"[A-Za-z0-9_]+")
-# One symbol standing alone in the question (`&`, `!`, `(`, `=`). `?` is the question mark.
-_LONE_SYMBOL = re.compile(r"(?<![A-Za-z0-9_])([^\sA-Za-z0-9_?])(?![A-Za-z0-9_])")
+# One symbol standing alone in the question (`&`, `!`, `(`, `=`). `?` is the question mark and a
+# backtick is only ever a wrapper. A key wrapped in backticks or quotes (`&`, "&") is read first,
+# so the wrapper is never taken for the key (cold review #2).
+_LONE_SYMBOL = re.compile(r"(?<![A-Za-z0-9_])([^\sA-Za-z0-9_?`])(?![A-Za-z0-9_])")
+_WRAPPED_SYMBOL = re.compile(r"""(?<![A-Za-z0-9_])(['"`])([^\sA-Za-z0-9_?])\1(?![A-Za-z0-9_])""")
 # How many candidates each search gives to the fusion, and how many exact-key pieces go first.
 POOL = 20
 KEY_FIRST = 2
+
+
+def lone_symbol(query: str) -> str | None:
+    m = _WRAPPED_SYMBOL.search(query)
+    if m:
+        return m.group(2)
+    m = _LONE_SYMBOL.search(query)
+    return m.group(1) if m else None
 
 
 def tokenize_words(text: str) -> list[str]:
@@ -59,10 +70,10 @@ def key_path(docs: dict[str, str], query: str) -> list[str]:
     counts 3x, so a definition beats a mere mention (spike S2). No lone symbol, or the
     symbol in no backticks: empty list.
     """
-    m = _LONE_SYMBOL.search(query)
-    if not m:
+    symbol = lone_symbol(query)
+    if symbol is None:
         return []
-    key = re.escape(m.group(1))
+    key = re.escape(symbol)
     anywhere = re.compile(r"`\s*" + key + r"\s*`")
     defined = re.compile(r"^\s*`\s*" + key + r"\s*`\s{2,}\S", re.MULTILINE)
     scored = [(len(anywhere.findall(t)) + 3 * len(defined.findall(t)), i)
@@ -106,12 +117,13 @@ class Searcher:
         if mode not in {"keyword", "meaning", "hybrid"}:
             raise ValueError(f"unknown search mode {mode!r}")
         query = query.strip()
+        # Nothing to search for (empty, or only "?"): no embedding call in any mode.
+        if not _WORD.search(query) and lone_symbol(query) is None:
+            return []
         if mode == "keyword":
-            return [Hit(i, s) for i, s in self._keyword(query, k)] if query else []
+            return [Hit(i, s) for i, s in self._keyword(query, k)]
         if self._embed is None or self._vsearch is None:
             raise ValueError("meaning/hybrid search needs embeddings")
-        if not query:
-            return []
         vhits = self._vsearch(self._embed(query), max(k, POOL))
         if mode == "meaning":
             return [Hit(i, s) for i, s in vhits[:k]]

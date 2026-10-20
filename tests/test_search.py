@@ -159,3 +159,29 @@ def test_real_docs_keyword_search_finds_the_right_page_in_top_5(query, pages):
     s = Searcher(_real_pieces())
     got = [h.piece_id.split(":")[0] for h in s.search("keyword", query, 5)]
     assert pages & set(got), got
+
+
+# --- cold review #2: quoted keys, junk questions in every mode ---
+
+@pytest.mark.parametrize("query", ["what does `&` do?", 'what does "&" do?', "what does '&' do?",
+                                   "what does `&`", "(`&`) what is it"])
+def test_key_path_reads_the_key_inside_backticks_or_quotes(query):
+    assert key_path(KEYS, query)[0] == "join:0"
+
+
+def test_a_quoted_double_quote_key_is_still_the_key():
+    assert key_path({"d:0": "`\"`   duplicates the selected rows"}, "what does `\"` do?") == ["d:0"]
+
+
+@pytest.mark.parametrize("mode", ["keyword", "meaning", "hybrid"])
+@pytest.mark.parametrize("junk", ["?", "??", "  ?  "])
+def test_junk_question_returns_no_hits_and_embeds_nothing_in_every_mode(mode, junk):
+    calls = []
+
+    def embed(t):
+        calls.append(t)
+        return [0.0]
+
+    s = Searcher(PIECES, embed_query=embed, vector_search=lambda v, k: [("quit:0", 1.0)])
+    assert s.search(mode, junk, 5) == []
+    assert calls == []

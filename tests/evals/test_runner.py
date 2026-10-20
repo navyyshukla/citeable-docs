@@ -136,3 +136,49 @@ def test_write_results_is_valid_json(tmp_path):
     write_results(out, {"split": "dev"}, {"keyword": rows}, {})
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["meta"]["split"] == "dev" and data["retrieval"]["keyword"][0]["hit"] is True
+
+
+# --- cold review #2: errors do not abort a run; citations are checked against the gold page ---
+
+class Always429:
+    name = "boom"
+
+    def complete(self, *a):
+        raise ProviderError("429", 429)
+
+
+def test_a_failed_answer_is_recorded_and_the_run_continues():
+    qs = [q("1", "what does & do?", page="join"), q("2", "x" * 501, page="join"),
+          q("3", "what does & do?", page="join")]
+    adapter = Adapter([Always429()])
+    rows, stopped = run_answers(qs, SEARCH, BY_ID, adapter, CFG, "VisiData", "keyword", 3, 1000)
+    assert [r.status for r in rows] == ["error", "error", "error"] and not stopped
+    assert "429" in rows[0].error and "longer" in rows[1].error
+    s = summarize_answers(rows)
+    assert s["errors"] == 3 and s["answered"] == 0
+
+
+def test_a_failed_embedding_is_recorded_as_a_retrieval_miss_and_the_run_continues():
+    def embed(t):
+        raise ProviderError("embedding down", 500)
+
+    s = Searcher(PIECES, embed_query=embed, vector_search=lambda v, k: [])
+    rows = run_retrieval([q("1", "what does & do?", page="join")], s, BY_ID, "meaning", 3)
+    assert rows[0].hit is False and "embedding down" in rows[0].error
+    assert summarize_retrieval(rows)["errors"] == 1
+
+
+def test_rows_record_which_pieces_were_cited_and_whether_one_is_the_gold_page():
+    good, _ = run_answers([q("1", "what does & do?", page="join")], SEARCH, BY_ID,
+                          Adapter([Fake("Use it [1].")]), CFG, "VisiData", "keyword", 3, 1000)
+    wrong, _ = run_answers([q("2", "what does & do?", page="cols")], SEARCH, BY_ID,
+                           Adapter([Fake("Use it [1].")]), CFG, "VisiData", "keyword", 3, 1000)
+    assert good[0].cited_ids == ["join:0"] and good[0].cited_gold is True
+    assert wrong[0].cited_ids == ["join:0"] and wrong[0].cited_gold is False
+    s = summarize_answers(good + wrong)
+    assert s["answered"] == 2 and s["answered_citing_gold"] == 1
+
+
+def test_all_answers_used_one_call_is_none_when_nothing_was_answered():
+    row = AnswerRow("1", "keyword", False, "abstained", True, 0, 1, None, 0.1)
+    assert summarize_answers([row])["all_answers_used_one_call"] is None

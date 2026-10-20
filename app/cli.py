@@ -71,22 +71,31 @@ def cmd_eval(args) -> int:
         rrf_k=cfg.search.rrf_k,
     )
     modes = args.modes.split(",")
-    retrieval, answers, stopped = {}, {}, {}
+    retrieval: dict = {}
+    answers: dict = {}
+    stopped: dict = {}
     adapter = build_adapter(cfg, os.environ) if args.answer else None
-    for mode in modes:
-        retrieval[mode] = run_retrieval(questions, searcher, by_id, mode, cfg.search.top_k)
-        print(mode, "retrieval:", summarize_retrieval(retrieval[mode]))
-        if adapter:
-            rows, early = run_answers(questions, searcher, by_id, adapter, cfg, cfg.project.name,
-                                      mode, cfg.search.top_k, args.max_neurons)
-            answers[mode], stopped[mode] = rows, early
-            print(mode, "answers:", summarize_answers(rows), "stopped_early:", early)
     meta = {"split": args.split, "n_questions": len(questions), "ref": cfg.project.ref,
             "modes": modes, "answered": bool(adapter), "stopped_early": stopped,
-            "total_neurons": adapter.total_neurons if adapter else 0.0,
-            "embedding_model": cfg.models.embedding}
-    write_results(Path(args.out), meta, retrieval, answers)
-    print("wrote", args.out)
+            "total_neurons": 0.0, "embedding_model": cfg.models.embedding}
+    # Results are written even if a later mode crashes: the neurons already spent are not lost.
+    try:
+        for mode in modes:
+            retrieval[mode] = run_retrieval(questions, searcher, by_id, mode, cfg.search.top_k)
+            print(mode, "retrieval:", summarize_retrieval(retrieval[mode]))
+            if adapter:
+                rows, early = run_answers(questions, searcher, by_id, adapter, cfg,
+                                          cfg.project.name, mode, cfg.search.top_k,
+                                          args.max_neurons)
+                answers[mode], stopped[mode] = rows, early
+                print(mode, "answers:", summarize_answers(rows), "stopped_early:", early)
+    except Exception as e:
+        meta["crashed"] = str(e)
+        raise
+    finally:
+        meta["total_neurons"] = adapter.total_neurons if adapter else 0.0
+        write_results(Path(args.out), meta, retrieval, answers)
+        print("wrote", args.out)
     return 0
 
 

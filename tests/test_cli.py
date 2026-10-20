@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from app.cli import main
 
 DOCS = {"join.md": "## How to join\n\nsteps\n", "rows.md": "## Rows\n\nsort\n"}
@@ -64,3 +66,28 @@ def test_eval_without_pieces_fails_cleanly(monkeypatch, capsys):
     _wire(monkeypatch, store)
     assert main(["eval", "--out", "x.json"]) == 1
     assert "ingest" in capsys.readouterr().err
+
+
+def test_eval_writes_partial_results_when_a_later_mode_crashes(monkeypatch, tmp_path):
+    from ingest.models import Piece
+    piece = Piece(id="join:0", page_slug="join", page_title="J", url="https://x/", anchor="",
+                  heading_path=("Join",), text="Type `&` to join.", docs_ref="stable",
+                  docs_version=None, last_updated=None)
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: [piece]
+    store.vector_search = lambda *a: []
+    _wire(monkeypatch, store)
+    q = tmp_path / "q.jsonl"
+    q.write_text('{"id":"a","question":"what does & do?","answerable":true,"gold_page":"join",'
+                 '"source":"synthetic","split":"dev"}\n')
+
+    def boom(*a, **k):
+        raise RuntimeError("quota gone")
+
+    monkeypatch.setattr("app.cli.embed_texts", boom)
+    out = tmp_path / "r.json"
+    with pytest.raises(RuntimeError):
+        main(["eval", "--modes", "keyword,hybrid", "--data", str(q), "--out", str(out)])
+    import json
+    data = json.loads(out.read_text())
+    assert list(data["retrieval"]) == ["keyword"] and data["meta"]["crashed"] == "quota gone"

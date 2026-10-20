@@ -197,3 +197,35 @@ def test_paste_all_sends_every_piece_in_one_call():
     assert a.status == "answered" and adapter.calls_made == 1
     assert "Type `&`" in fake.seen[1] and "Sort rows." in fake.seen[1]
     assert [c.n for c in a.citations] == [2]
+
+
+# --- cold review #2: more link forms ---
+
+@pytest.mark.parametrize("text", [
+    "see [here][r]\n\n[r]: //evil.com/p",
+    "see [here][r]\n\n[r]: https://evil.com/p \"title\"",
+    "![p][i]\n\n[i]: //evil.com/t.png",
+    "<HTTPS://evil.com>", "go to HTTPS://evil.com/x now", "HTTP://evil.com",
+    "<a href=//evil.com>x</a>", "<img src=//evil.com/a.png>", "<a href='https://evil.com'>x</a>",
+    "<A HREF=\"https://evil.com\">x</A>", "<iframe src=\"https://evil.com\"></iframe>",
+    "<script>fetch('//evil.com')</script>", "see //evil.com/path now",
+])
+def test_check_output_removes_reference_style_uppercase_scheme_and_html_forms(text):
+    out = check_output(text, {"https://www.visidata.org/docs/join/"})
+    assert "evil" not in out.lower()
+
+
+def test_check_output_keeps_ordinary_text_with_slashes_and_angle_keys():
+    text = "Press `<Tab>` then use `a//b` or open C://tmp. The path is /docs/x [1]."
+    assert check_output(text, set()) == text
+
+
+def test_a_lookalike_host_does_not_pass_the_site_check():
+    cfg = CFG.model_copy(update={"project": CFG.project.model_copy(
+        update={"site_base_url": "https://www.visidata.org"})})
+    p = mk("join:0", "See [x](https://www.visidata.org.evil.com/p) and "
+                     "[y](https://www.visidata.org/docs/guide/).")
+    fake = Fake("Link https://www.visidata.org.evil.com/p and https://www.visidata.org/docs/guide/ [1]")
+    a = answer_question("what does & do?", [Hit("join:0", 1.0)], {"join:0": p}, Adapter([fake]),
+                        cfg, "VisiData")
+    assert "evil" not in a.text and "https://www.visidata.org/docs/guide/" in a.text
