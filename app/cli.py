@@ -14,6 +14,7 @@ from app.llm.build import build_adapter
 from app.llm.cloudflare import CloudflareClient, embed_texts
 from app.search import Searcher
 from app.store import Store
+from app.usage import Usage
 from evals.runner import (RetrievalRow, run_answers, run_retrieval, summarize_answers, summarize_retrieval,
                           write_results)
 from evals.schema import load_questions
@@ -120,6 +121,60 @@ def cmd_eval(args) -> int:
     return 0
 
 
+def _db() -> Db:
+    return Db(os.environ["DATABASE_URL"])
+
+
+def cmd_init_db(args) -> int:
+    cfg = load_config(args.config)
+    db = Db(os.environ["DATABASE_URL"])
+    Store(db, cfg.models.embedding_dim, vector_index=cfg.search.vector_index).init_schema()
+    Usage(db).init_schema()
+    print("tables ready: pieces, ingest_meta, invite_tokens, questions, feedback")
+    return 0
+
+
+def cmd_token(args) -> int:
+    usage = Usage(_db())
+    if args.action == "create":
+        try:
+            token = usage.create_token(args.label)
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return 1
+        print(f"token for {args.label}: {token}")
+        print("Copy it now: it is stored only as a hash and will not be shown again.")
+        return 0
+    if args.action == "revoke":
+        if not usage.revoke_token(args.label):
+            print(f"no active token labelled {args.label!r}", file=sys.stderr)
+            return 1
+        print(f"revoked {args.label}")
+        return 0
+    print(f"{'label':<20} {'created':<12} {'state':<8} questions today")
+    for t in usage.list_tokens():
+        state = "revoked" if t.revoked else "active"
+        print(f"{t.label:<20} {t.created_at:%Y-%m-%d}   {state:<8} {t.questions_today}")
+    return 0
+
+
+def cmd_purge(args) -> int:
+    cfg = load_config(args.config)
+    days = args.days if args.days is not None else cfg.limits.retention_days
+    n = Usage(_db()).purge(days)
+    print(f"deleted {n} questions older than {days} days (feedback goes with them)")
+    return 0
+
+
+def cmd_serve(args) -> int:
+    import uvicorn  # imported here: only the server needs it
+
+    # access_log off: the access log would record client IPs, and we promise not to keep them.
+    uvicorn.run("app.api:build_from_env", factory=True, host=args.host, port=args.port,
+                access_log=False)
+    return 0
+
+
 def cmd_calibrate(args) -> int:
     """Print what each evidence threshold would do. Reads a saved file: no network, no neurons."""
     data = json.loads(Path(args.retrieval).read_text(encoding="utf-8"))
@@ -161,8 +216,24 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--retrieval", required=True)
     c.add_argument("--mode", default="hybrid")
     c.add_argument("--config", default=argparse.SUPPRESS)
+    sub.add_parser("init-db").add_argument("--config", default=argparse.SUPPRESS)
+    t = sub.add_parser("token")
+    t.add_argument("action", choices=["create", "revoke", "list"])
+    t.add_argument("label", nargs="?")
+    t.add_argument("--config", default=argparse.SUPPRESS)
+    u = sub.add_parser("purge")
+    u.add_argument("--days", type=int, default=None)
+    u.add_argument("--config", default=argparse.SUPPRESS)
+    v = sub.add_parser("serve")
+    v.add_argument("--host", default="127.0.0.1")
+    v.add_argument("--port", type=int, default=8000)
+    v.add_argument("--config", default=argparse.SUPPRESS)
     args = p.parse_args(argv)
-    return {"ingest": cmd_ingest, "eval": cmd_eval, "calibrate": cmd_calibrate}[args.cmd](args)
+    if args.cmd == "token" and args.action != "list" and not args.label:
+        p.error(f"token {args.action} needs a LABEL")
+    return {"ingest": cmd_ingest, "eval": cmd_eval, "calibrate": cmd_calibrate,
+            "init-db": cmd_init_db, "token": cmd_token, "purge": cmd_purge,
+            "serve": cmd_serve}[args.cmd](args)
 
 
 if __name__ == "__main__":

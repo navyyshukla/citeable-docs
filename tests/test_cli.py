@@ -175,3 +175,94 @@ def test_calibrate_unknown_mode_fails_cleanly(tmp_path, capsys):
     f.write_text(json.dumps({"meta": {}, "retrieval": {"hybrid": []}}))
     assert main(["calibrate", "--retrieval", str(f), "--mode", "nope"]) == 1
     assert "nope" in capsys.readouterr().err
+
+
+class FakeUsage:
+    def __init__(self):
+        self.created, self.revoked, self.purged, self.schema = [], [], [], False
+        self.active = {"ann"}
+
+    def init_schema(self):
+        self.schema = True
+
+    def create_token(self, label):
+        if label in self.active:
+            raise ValueError(f"a token labelled {label!r} already exists")
+        self.created.append(label)
+        return "PLAIN-TOKEN-123"
+
+    def revoke_token(self, label):
+        self.revoked.append(label)
+        return label in self.active
+
+    def list_tokens(self):
+        from datetime import datetime, timezone
+
+        from app.usage import TokenInfo
+        t = datetime(2026, 10, 20, tzinfo=timezone.utc)
+        return [TokenInfo("ann", t, False, 3), TokenInfo("bob", t, True, 0)]
+
+    def purge(self, older_than_days):
+        self.purged.append(older_than_days)
+        return 7
+
+
+def _admin(monkeypatch):
+    usage, store = FakeUsage(), FakeStore(stored=0)
+    store.inited = False
+    store.init_schema = lambda: setattr(store, "inited", True)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setattr("app.cli.Usage", lambda db: usage)
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+    return usage, store
+
+
+def test_init_db_creates_every_table(monkeypatch):
+    usage, store = _admin(monkeypatch)
+    assert main(["init-db"]) == 0
+    assert usage.schema and store.inited
+
+
+def test_token_create_prints_plain_token_once(monkeypatch, capsys):
+    usage, _ = _admin(monkeypatch)
+    assert main(["token", "create", "carol"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("PLAIN-TOKEN-123") == 1 and "carol" in out and "not be shown again" in out
+    assert usage.created == ["carol"]
+
+
+def test_token_create_duplicate_label_fails_cleanly(monkeypatch, capsys):
+    _admin(monkeypatch)
+    assert main(["token", "create", "ann"]) == 1
+    assert "already exists" in capsys.readouterr().err
+
+
+def test_token_revoke(monkeypatch, capsys):
+    usage, _ = _admin(monkeypatch)
+    assert main(["token", "revoke", "ann"]) == 0
+    assert main(["token", "revoke", "zed"]) == 1
+    assert "zed" in capsys.readouterr().err
+
+
+def test_token_list_shows_labels_and_never_hashes(monkeypatch, capsys):
+    _admin(monkeypatch)
+    assert main(["token", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "ann" in out and "bob" in out and "revoked" in out
+    assert "hash" not in out.lower() and "PLAIN" not in out
+
+
+def test_purge_defaults_to_the_configured_retention(monkeypatch, capsys):
+    usage, _ = _admin(monkeypatch)
+    assert main(["purge"]) == 0
+    assert main(["purge", "--days", "7"]) == 0
+    assert usage.purged == [30, 7]
+    assert "7" in capsys.readouterr().out
+
+
+def test_serve_runs_the_factory_without_an_access_log(monkeypatch):
+    calls = {}
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.update(app=app, **kw))
+    assert main(["serve", "--port", "9000"]) == 0
+    assert calls["app"] == "app.api:build_from_env" and calls["factory"] is True
+    assert calls["access_log"] is False and calls["port"] == 9000
