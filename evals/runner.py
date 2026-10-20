@@ -12,7 +12,11 @@ from ingest.models import Piece
 
 
 def is_hit(piece: Piece, q: EvalQuestion) -> bool:
-    if q.gold_page is None or piece.page_slug != q.gold_page:
+    if q.gold_page is None:
+        return False
+    if piece.page_slug in q.also_gold_pages:  # another page that also answers it: no heading rule
+        return True
+    if piece.page_slug != q.gold_page:
         return False
     if q.gold_heading is None:
         return True
@@ -74,9 +78,11 @@ def run_answers(questions: list[EvalQuestion], searcher: Searcher, pieces_by_id:
                 adapter: Adapter, cfg: Config, project_name: str, mode: str, k: int,
                 max_neurons: float) -> tuple[list[AnswerRow], bool]:
     rows: list[AnswerRow] = []
+    worst = 0.0  # most neurons one question has cost so far: keep room for one more
     for q in questions:
-        if adapter.total_neurons >= max_neurons:
+        if adapter.total_neurons + worst >= max_neurons:
             return rows, True
+        spent_before = adapter.total_neurons
         # A bad question or a failed call becomes one "error" row and the run goes on (the
         # neurons already spent stay counted). A wrong mode is a setup bug and still raises.
         try:
@@ -88,8 +94,10 @@ def run_answers(questions: list[EvalQuestion], searcher: Searcher, pieces_by_id:
             hits = searcher.search(mode, q.question, k)
             a = answer_question(q.question, hits, pieces_by_id, adapter, cfg, project_name)
         except (AllProvidersFailed, ProviderError) as e:
+            worst = max(worst, adapter.total_neurons - spent_before)
             rows.append(_error_row(q, mode, e))
             continue
+        worst = max(worst, adapter.total_neurons - spent_before)
         abstained_ok = (a.status == "abstained") if not q.answerable else None
         kept = [pieces_by_id[h.piece_id] for h in hits if h.piece_id in pieces_by_id]
         cited = [kept[c.n - 1] for c in a.citations if 1 <= c.n <= len(kept)]

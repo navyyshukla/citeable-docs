@@ -182,3 +182,21 @@ def test_rows_record_which_pieces_were_cited_and_whether_one_is_the_gold_page():
 def test_all_answers_used_one_call_is_none_when_nothing_was_answered():
     row = AnswerRow("1", "keyword", False, "abstained", True, 0, 1, None, 0.1)
     assert summarize_answers([row])["all_answers_used_one_call"] is None
+
+
+def test_budget_stop_leaves_room_for_one_more_question():
+    qs = [q(str(i), "what does & do?", page="join") for i in range(5)]
+    adapter = Adapter([Fake(neurons=40.0)])
+    rows, stopped = run_answers(qs, SEARCH, BY_ID, adapter, CFG, "VisiData", "keyword", 3,
+                                max_neurons=100)
+    assert stopped and adapter.total_neurons <= 100
+
+
+def test_also_gold_pages_count_as_hits_and_the_heading_rule_is_for_the_main_page():
+    qq = EvalQuestion(id="x", question="save a session", answerable=True,
+                      gold_page="internal_formats", gold_heading=".vds",
+                      also_gold_pages=["save-restore"], source="real", split="dev")
+    assert is_hit(mk("save-restore:0", "t", ("Save", "How to save")), qq)
+    assert is_hit(mk("internal_formats:4", "t", ("Formats", ".vds")), qq)
+    assert not is_hit(mk("internal_formats:0", "t", ("Formats", "intro")), qq)
+    assert not is_hit(mk("rows:0", "t", ("Rows",)), qq)

@@ -11,6 +11,8 @@ class EvalQuestion(BaseModel):
     answerable: bool
     gold_page: str | None = None
     gold_heading: str | None = None
+    # Other pages that also answer the question (any piece of them counts as a hit).
+    also_gold_pages: list[str] = Field(default_factory=list)
     reference_answer: str | None = None
     source: Literal["real", "doc-based", "agent-made", "synthetic", "tricky"]
     source_url: str | None = None

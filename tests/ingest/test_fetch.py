@@ -102,3 +102,25 @@ def test_no_markdown_found_is_an_error_not_an_empty_result():
 def test_utf8_bom_is_dropped():
     tar = make_tar({"r/docs/a.md": b"\xef\xbb\xbf---\nUpdate: 2020-01-01\n---\ntext\n"})
     assert _docs_from_tarball(tar, "docs")["a.md"].startswith("---")
+
+
+def test_commit_sha_is_read_from_the_tarball_header():
+    from ingest.fetch import commit_from_tarball, fetch_docs_and_commit
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.PAX_FORMAT,
+                      pax_headers={"comment": "6c4c5a4f24e68d1fa34d79bbb8362662e30b2450"}) as tf:
+        data = b"## Join\ntext\n"
+        info = tarfile.TarInfo("visidata-stable/docs/join.md")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+    tar = buf.getvalue()
+    assert commit_from_tarball(tar) == "6c4c5a4f24e68d1fa34d79bbb8362662e30b2450"
+    assert commit_from_tarball(TAR) is None
+    files, sha = fetch_docs_and_commit("a/b", "stable", "docs",
+                                       _client(lambda r: httpx.Response(200, content=tar)))
+    assert set(files) == {"join.md"} and sha.startswith("6c4c5a4f")
+
+
+def test_non_utf8_file_gives_a_warning_that_names_it():
+    with pytest.warns(UserWarning, match="bad.md"):
+        _docs_from_tarball(TAR, "docs")

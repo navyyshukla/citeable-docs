@@ -229,3 +229,34 @@ def test_a_lookalike_host_does_not_pass_the_site_check():
     a = answer_question("what does & do?", [Hit("join:0", 1.0)], {"join:0": p}, Adapter([fake]),
                         cfg, "VisiData")
     assert "evil" not in a.text and "https://www.visidata.org/docs/guide/" in a.text
+
+
+# --- minors from cold review #2: citation parsing, closest pages on every refusal ---
+
+@pytest.mark.parametrize("text", ["Use it [1, 2].", "Use it [1,2]."])
+def test_comma_citation_lists_are_recognised(text):
+    a, _, _ = run(text)
+    assert a.status == "answered" and [c.n for c in a.citations] == [1, 2]
+
+
+def test_a_bracket_index_inside_code_is_not_a_citation():
+    a, _, _ = run("Use `row[1]` for it.")
+    assert a.status == "abstained"
+    b, _, _ = run("Use `a[9]` here [1].")
+    assert b.status == "answered" and "`a[9]`" in b.text and b.invalid_citations == []
+
+
+def test_invalid_markers_are_removed_from_the_shown_text_and_valid_ones_kept():
+    a, _, _ = run("Yes [1] and also [9]. Or [1, 9].")
+    assert a.invalid_citations == [9] and "9" not in a.text and a.text.count("[1]") == 2
+
+
+def test_a_reply_that_is_only_a_citation_is_abstained():
+    for text in ("[1]", " [1] [2] ", "[1]."):
+        a, _, _ = run(text)
+        assert a.status == "abstained", text
+
+
+def test_a_refusal_for_no_valid_citation_still_shows_the_closest_pages():
+    a, _, _ = run("PWNED")
+    assert a.status == "abstained" and len(a.closest) == 2

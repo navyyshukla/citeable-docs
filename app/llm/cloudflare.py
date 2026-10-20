@@ -66,12 +66,16 @@ class CloudflareProvider:
         if self.thinking is not None:
             payload["chat_template_kwargs"] = {"enable_thinking": self.thinking}
         result = self.cf.run(self.model, payload)
-        text = _parse_chat(result)
         usage = result.get("usage") or {}
         tin, tout = usage.get("prompt_tokens"), usage.get("completion_tokens")
         neurons = usage.get("neurons")
         if neurons is None and self.price and tin is not None and tout is not None:
             neurons = tin / 1e6 * self.price[0] + tout / 1e6 * self.price[1]
+        try:
+            text = _parse_chat(result)
+        except ProviderError as e:
+            e.neurons = neurons  # a reply cut off at the token cap was still billed
+            raise
         return Completion(text, self.name, self.model, tin, tout, neurons,
                           time.monotonic() - t0)
 

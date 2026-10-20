@@ -108,3 +108,12 @@ def test_real_docs_build_unique_well_formed_pieces():
     shape = re.compile(r"^https://www\.visidata\.org/docs/([A-Za-z0-9._~%-]+/)?(#[A-Za-z0-9_-]+)?$")
     assert all(shape.match(p.citation_url) for p in pieces)
     assert {p.docs_ref for p in pieces} == {"stable"}
+
+
+def test_docs_ref_can_carry_the_commit():
+    from app.config import load_config
+    from ingest.pipeline import build_pieces
+    cfg = load_config("config/visidata.yaml").project
+    ps = build_pieces({"join.md": "## Join\n\ntext\n"}, cfg, docs_ref="stable@6c4c5a4f24")
+    assert ps and all(p.docs_ref == "stable@6c4c5a4f24" for p in ps)
+    assert all(p.docs_ref == cfg.ref for p in build_pieces({"join.md": "## Join\n\ntext\n"}, cfg))

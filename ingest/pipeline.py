@@ -35,7 +35,8 @@ def absolutize_links(text: str, page_url: str, site_root: str) -> str:
     return _LINK.sub(repl, text)
 
 
-def build_pieces(files: dict[str, str], cfg: ProjectCfg) -> list[Piece]:
+def build_pieces(files: dict[str, str], cfg: ProjectCfg,
+                 docs_ref: str | None = None) -> list[Piece]:
     base = cfg.site_base_url.rstrip("/")
     parts = urlsplit(base)
     site_root = f"{parts.scheme}://{parts.netloc}"
@@ -54,7 +55,7 @@ def build_pieces(files: dict[str, str], cfg: ProjectCfg) -> list[Piece]:
             pieces.append(Piece(
                 id=f"{stem}:{n}", page_slug=stem, page_title=title, url=url,
                 anchor=raw.anchor, heading_path=raw.heading_path, text=text,
-                docs_ref=cfg.ref, docs_version=doc.docs_version, last_updated=doc.last_updated,
+                docs_ref=docs_ref or cfg.ref, docs_version=doc.docs_version, last_updated=doc.last_updated,
                 anchor_explicit=raw.anchor_explicit,
             ))
     return pieces

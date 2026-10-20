@@ -10,7 +10,8 @@ from ingest.models import Piece
 
 NOT_FOUND_TEXT = "I couldn't find this in the VisiData docs."
 _NOT_FOUND = re.compile(r"^\W*not[_ ]found\b", re.IGNORECASE)
-_CITE = re.compile(r"\[(\d+)\]")
+# A citation is [1] or [1, 2]; brackets inside code (`row[1]`) are not citations.
+_MARKER = re.compile(r"(?P<code>```.*?```|`[^`\n]*`)|\[(?P<nums>\d+(?:\s*,\s*\d+)*)\]", re.DOTALL)
 _IMAGE = re.compile(r"!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])")  # inline and reference-style
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 # A reference definition line: "[r]: https://target "title"". It is a link even with no text.
@@ -87,6 +88,24 @@ def _on_site(url: str, site: str) -> bool:
             and (not base or u.path == base or u.path.startswith(base + "/")))
 
 
+def _cited_numbers(text: str) -> list[int]:
+    found: set[int] = set()
+    for m in _MARKER.finditer(text):
+        if m.group("nums"):
+            found |= {int(x) for x in m.group("nums").split(",")}
+    return sorted(found)
+
+
+def _drop_invalid_markers(text: str, n_sent: int) -> str:
+    """Keep only citation numbers that point at a piece we sent; leave code untouched."""
+    def repl(m: re.Match) -> str:
+        if m.group("code"):
+            return m.group(0)
+        keep = [x for x in (int(v) for v in m.group("nums").split(",")) if 1 <= x <= n_sent]
+        return f"[{', '.join(map(str, keep))}]" if keep else ""
+    return re.sub(r" +([.,;:!?])", r"\1", _MARKER.sub(repl, text)).strip()
+
+
 def _citation(n: int, p: Piece) -> Citation:
     return Citation(n, " › ".join(p.heading_path), p.citation_url, p.docs_version, p.last_updated)
 
@@ -117,18 +136,23 @@ def _answer_from(question: str, excerpts: list[Piece], adapter: Adapter, cfg: Co
     if _NOT_FOUND.match(c.text):
         return Answer("abstained", NOT_FOUND_TEXT,
                       closest=[_citation(n, p) for n, p in enumerate(excerpts[:3], start=1)], **meta)
-    cited = sorted({int(n) for n in _CITE.findall(c.text)})
+    cited = _cited_numbers(c.text)
     invalid = [n for n in cited if not 1 <= n <= len(excerpts)]
     valid = [n for n in cited if 1 <= n <= len(excerpts)]
-    if not valid:  # no citation of a piece we sent: could be an injected reply (S10)
-        return Answer("abstained", NOT_FOUND_TEXT, invalid_citations=invalid, **meta)
+    closest = [_citation(n, p) for n, p in enumerate(excerpts[:3], start=1)]
+    shown = _drop_invalid_markers(c.text, len(excerpts))
+    # No citation of a piece we sent could be an injected reply (S10); a reply that is only
+    # citation markers says nothing.
+    if not valid or not re.search(r"[A-Za-z0-9]", _MARKER.sub("", shown)):
+        return Answer("abstained", NOT_FOUND_TEXT, closest=closest, invalid_citations=invalid,
+                      **meta)
     allowed = {p.url for p in excerpts} | {p.citation_url for p in excerpts}
     # Links inside a piece count only if they point at the docs' own site: a poisoned piece can
     # carry any link it likes (S5b), so a link to somewhere else never passes.
     site = cfg.project.site_base_url
     for p in excerpts:
         allowed |= {u for u in _urls_in(p.text) if _on_site(u, site)}
-    return Answer("answered", check_output(c.text, allowed),
+    return Answer("answered", check_output(shown, allowed),
                   citations=[_citation(n, excerpts[n - 1]) for n in valid],
                   invalid_citations=invalid, **meta)
 

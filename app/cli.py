@@ -15,7 +15,7 @@ from app.store import Store
 from evals.runner import (run_answers, run_retrieval, summarize_answers, summarize_retrieval,
                           write_results)
 from evals.schema import load_questions
-from ingest.fetch import fetch_docs
+from ingest.fetch import fetch_docs_and_commit
 from ingest.pipeline import build_pieces
 
 MIN_PIECES = 100  # the real docs give about 230; fewer means a broken download or parse
@@ -28,21 +28,31 @@ def _store(cfg) -> Store:
 
 def cmd_ingest(args) -> int:
     cfg = load_config(args.config)
-    files = fetch_docs(cfg.project.upstream_repo, cfg.project.ref, cfg.project.docs_path)
-    pieces = build_pieces(files, cfg.project)
+    files, commit = fetch_docs_and_commit(cfg.project.upstream_repo, cfg.project.ref,
+                                          cfg.project.docs_path)
+    # `ref` is a moving branch: store the commit too, so a baseline can be reproduced.
+    docs_ref = f"{cfg.project.ref}@{commit[:10]}" if commit else cfg.project.ref
+    pieces = build_pieces(files, cfg.project, docs_ref=docs_ref)
     per_page = Counter(p.page_slug for p in pieces)
-    print(f"ref={cfg.project.ref}: {len(per_page)} pages, {len(pieces)} pieces")
+    print(f"ref={docs_ref}: {len(per_page)} pages, {len(pieces)} pieces")
     for slug, n in sorted(per_page.items()):
         print(f"  {slug}: {n}")
     if args.dry_run:
         return 0
     store = _store(cfg)
     store.init_schema()
-    # An empty or tiny parse must never delete the stored pieces (cold review of Tasks 6-9).
-    floor = max(MIN_PIECES, len(store.load_pieces(cfg.project.slug)) // 2)
+    # An empty or tiny parse must never delete the stored pieces (cold review of Tasks 6-9),
+    # and neither may a parse that lost whole pages (cold review #2).
+    stored = store.load_pieces(cfg.project.slug)
+    floor = max(MIN_PIECES, len(stored) // 2)
     if len(pieces) < floor:
         print(f"refusing to replace: built {len(pieces)} pieces, expected at least {floor}",
               file=sys.stderr)
+        return 1
+    gone = sorted({p.page_slug for p in stored} - set(per_page))
+    if gone and not args.allow_shrink:
+        print(f"refusing to replace: pages {gone} are stored but missing from this parse "
+              "(use --allow-shrink if the docs really dropped them)", file=sys.stderr)
         return 1
     cf = CloudflareClient(os.environ["CF_ACCOUNT_ID"], os.environ["CF_API_TOKEN"],
                           httpx.Client(timeout=60))
@@ -105,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("ingest")
     i.add_argument("--dry-run", action="store_true")
+    i.add_argument("--allow-shrink", action="store_true")
     i.add_argument("--config", default=argparse.SUPPRESS)
     e = sub.add_parser("eval")
     e.add_argument("--split", default="dev")

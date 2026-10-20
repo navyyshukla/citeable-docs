@@ -38,3 +38,17 @@ def test_all_failing_raises_with_every_reason():
 def test_no_providers_is_an_error():
     with pytest.raises(AllProvidersFailed):
         Adapter([]).complete("s", "u", 50)
+
+
+def test_neurons_burned_by_a_failed_attempt_count_toward_the_total():
+    a = Adapter([Fake("main", error=ProviderError("cut off", neurons=27.0)),
+                 Fake("backup", "ok", neurons=1.0)])
+    a.complete("s", "u", 50)
+    assert a.total_neurons == 28.0
+
+
+def test_neurons_of_failed_attempts_count_even_when_every_provider_fails():
+    a = Adapter([Fake("main", error=ProviderError("cut off", neurons=27.0))])
+    with pytest.raises(AllProvidersFailed):
+        a.complete("s", "u", 50)
+    assert a.total_neurons == 27.0

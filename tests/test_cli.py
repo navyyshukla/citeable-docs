@@ -4,11 +4,12 @@ import pytest
 
 from app.cli import main
 
+SHA = "abcdef0123456789abcdef0123456789abcdef01"
 DOCS = {"join.md": "## How to join\n\nsteps\n", "rows.md": "## Rows\n\nsort\n"}
 
 
 def test_ingest_dry_run_prints_counts_without_network(monkeypatch, capsys):
-    monkeypatch.setattr("app.cli.fetch_docs", lambda repo, ref, path: DOCS)
+    monkeypatch.setattr("app.cli.fetch_docs_and_commit", lambda repo, ref, path: (DOCS, SHA))
     assert main(["ingest", "--dry-run", "--config", "config/visidata.yaml"]) == 0
     out = capsys.readouterr().out
     assert "2 pages" in out and "2 pieces" in out and "ref=stable" in out
@@ -16,24 +17,28 @@ def test_ingest_dry_run_prints_counts_without_network(monkeypatch, capsys):
 
 class FakeStore:
     """Stands in for Store; records whether the replace was attempted."""
-    def __init__(self, stored: int):
-        self.stored, self.replaced = stored, False
+    def __init__(self, stored: int, pages: tuple = ("p",)):
+        self.stored, self.pages, self.replaced = stored, pages, False
 
     def init_schema(self):
         pass
 
     def load_pieces(self, project):
-        return [object()] * self.stored
+        return [SimpleNamespace(page_slug=self.pages[i % len(self.pages)])
+                for i in range(self.stored)]
 
     def replace_project_pieces(self, project, pieces, vectors):
-        self.replaced = True
+        self.replaced, self.pieces = True, pieces
+
+
+FAKE_PIECES = [SimpleNamespace(page_slug="p", search_text="t")] * 150
 
 
 def _wire(monkeypatch, store):
     monkeypatch.setenv("CF_ACCOUNT_ID", "a")
     monkeypatch.setenv("CF_API_TOKEN", "t")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x")
-    monkeypatch.setattr("app.cli.fetch_docs", lambda repo, ref, path: DOCS)
+    monkeypatch.setattr("app.cli.fetch_docs_and_commit", lambda repo, ref, path: (DOCS, SHA))
     monkeypatch.setattr("app.cli.embed_texts", lambda cf, m, texts, b: [[0.0]] * len(texts))
     monkeypatch.setattr("app.cli.Store", lambda dsn, dim, **kw: store)
 
@@ -56,7 +61,7 @@ def test_ingest_refuses_tiny_result_even_when_database_is_empty(monkeypatch):
 def test_ingest_replaces_when_count_is_plausible(monkeypatch):
     store = FakeStore(stored=120)
     _wire(monkeypatch, store)
-    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg: [SimpleNamespace(page_slug='p', search_text='t')] * 150)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
     assert main(["ingest"]) == 0
     assert store.replaced
 
@@ -91,3 +96,26 @@ def test_eval_writes_partial_results_when_a_later_mode_crashes(monkeypatch, tmp_
     import json
     data = json.loads(out.read_text())
     assert list(data["retrieval"]) == ["keyword"] and data["meta"]["crashed"] == "quota gone"
+
+
+def test_ingest_refuses_when_stored_pages_vanish_unless_allowed(monkeypatch, capsys):
+    store = FakeStore(stored=150, pages=("a", "b"))
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest"]) == 1 and not store.replaced
+    assert "b" in capsys.readouterr().err
+    assert main(["ingest", "--allow-shrink"]) == 0 and store.replaced
+
+
+def test_pieces_are_stored_with_the_docs_commit_in_docs_ref(monkeypatch):
+    store = FakeStore(stored=120)
+    _wire(monkeypatch, store)
+    seen = {}
+
+    def build(files, cfg, docs_ref=None):
+        seen["ref"] = docs_ref
+        return FAKE_PIECES
+
+    monkeypatch.setattr("app.cli.build_pieces", build)
+    assert main(["ingest"]) == 0
+    assert seen["ref"] == "stable@abcdef0123"

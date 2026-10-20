@@ -3,9 +3,10 @@ from typing import Protocol
 
 
 class ProviderError(Exception):
-    def __init__(self, message: str, status: int | None = None):
+    def __init__(self, message: str, status: int | None = None, neurons: float | None = None):
         super().__init__(message)
         self.status = status
+        self.neurons = neurons  # quota a failed attempt still burned (e.g. a cut-off reply)
 
 
 class AllProvidersFailed(Exception):
@@ -55,6 +56,7 @@ class Adapter:
             try:
                 c = p.complete(system, user, max_tokens)
             except ProviderError as e:
+                self.total_neurons += e.neurons or 0.0
                 label = f"{p.name}:{getattr(p, 'model', '?')}"
                 errors.append(f"{label}: {e}")
                 continue

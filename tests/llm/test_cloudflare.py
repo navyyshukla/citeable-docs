@@ -150,3 +150,12 @@ def test_embed_wrong_shape_is_an_error():
     c = client_with(lambda r: httpx.Response(200, json={"result": {"data": []}}))
     with pytest.raises(ProviderError):
         embed_texts(c, "emb", ["a"], batch=1)
+
+
+def test_a_cut_off_reply_still_reports_the_neurons_it_burned():
+    body = gemma_reply(finish="length", usage={"prompt_tokens": 500, "completion_tokens": 1000,
+                                               "neurons": 27.0})
+    p = CloudflareProvider(client_with(lambda r: httpx.Response(200, json=body)), "g")
+    with pytest.raises(ProviderError) as e:
+        p.complete("s", "u", 50)
+    assert e.value.neurons == 27.0
