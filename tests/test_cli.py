@@ -266,3 +266,71 @@ def test_serve_runs_the_factory_without_an_access_log(monkeypatch):
     assert main(["serve", "--port", "9000"]) == 0
     assert calls["app"] == "app.api:build_from_env" and calls["factory"] is True
     assert calls["access_log"] is False and calls["port"] == 9000
+
+
+def _judge_files(tmp_path, answers_row=None):
+    import json
+    q = tmp_path / "q.jsonl"
+    q.write_text(json.dumps({"id": "a", "question": "a public paraphrase", "answerable": True,
+                             "gold_page": "join", "source": "synthetic", "split": "dev",
+                             "reference_answer": "ref"}) + "\n")
+    row = answers_row or {"id": "a", "status": "answered", "text": "It joins [1].",
+                          "cited_ids": ["join:0"], "question": "a public paraphrase"}
+    res = tmp_path / "res.json"
+    res.write_text(json.dumps({"meta": {"split": "dev"}, "answers": {"hybrid": [row]}}))
+    return q, res
+
+
+def test_judge_writes_verdicts_and_says_uncalibrated(monkeypatch, tmp_path, capsys):
+    import json
+
+    from app.llm.base import Completion
+    q, res = _judge_files(tmp_path)
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: [SimpleNamespace(id="join:0", text="Type & to join.")]
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+
+    class G:
+        def __init__(self, key, json_output=False):
+            assert json_output is True
+
+        def complete(self, s, u, n):
+            assert "Type & to join." in u
+            return Completion('{"grounded": true, "correct": true, "reason": "ok"}', "gemini",
+                              "m", 1, 1, None, 0.1)
+
+    monkeypatch.setattr("app.cli.GeminiProvider", G)
+    out = tmp_path / "v.json"
+    assert main(["judge", "--results", str(res), "--data", str(q), "--mode", "hybrid",
+                 "--out", str(out)]) == 0
+    verdicts = json.loads(out.read_text())
+    assert verdicts[0]["question_id"] == "a" and verdicts[0]["correct"] is True
+    assert "uncalibrated" in capsys.readouterr().out.lower()
+
+
+def test_judge_refuses_results_with_questions_outside_the_curated_file(monkeypatch, tmp_path,
+                                                                       capsys):
+    q, res = _judge_files(tmp_path, {"id": "zzz", "status": "answered", "text": "t",
+                                     "cited_ids": [], "question": "typed by a visitor"})
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: []
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+    assert main(["judge", "--results", str(res), "--data", str(q), "--out",
+                 str(tmp_path / "v.json")]) == 1
+    assert "zzz" in capsys.readouterr().err
+
+
+def test_judge_agreement_prints_precision_and_recall(tmp_path, capsys):
+    import json
+    v = tmp_path / "v.json"
+    v.write_text(json.dumps([{"question_id": "1", "grounded": True, "correct": True,
+                              "reason": "", "error": None}]))
+    lab = tmp_path / "l.jsonl"
+    lab.write_text(json.dumps({"question_id": "1", "correct": True}) + "\n")
+    assert main(["judge-agreement", "--verdicts", str(v), "--labels", str(lab)]) == 0
+    out = capsys.readouterr().out
+    assert "precision" in out and "recall" in out and "1.00" in out

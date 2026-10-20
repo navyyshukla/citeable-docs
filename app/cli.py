@@ -1,6 +1,7 @@
 """Commands: ingest docs into the database; run evals."""
 import argparse
 import json
+from dataclasses import asdict
 import os
 import sys
 from collections import Counter
@@ -12,11 +13,14 @@ from app.config import load_config
 from app.db import Db
 from app.llm.build import build_adapter
 from app.llm.cloudflare import CloudflareClient, embed_texts
+from app.llm.gemini import GeminiProvider
 from app.search import Searcher
 from app.store import Store
 from app.usage import Usage
 from evals.runner import (RetrievalRow, run_answers, run_retrieval, summarize_answers, summarize_retrieval,
                           write_results)
+from evals.judge import (JudgeVerdict, agreement, items_from_results, judge_answer,
+                         load_labels)
 from evals.schema import load_questions
 from evals.threshold import threshold_table
 from ingest.fetch import fetch_docs_and_commit
@@ -175,6 +179,47 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def cmd_judge(args) -> int:
+    """Score saved eval answers with Gemini. Reads the public docs pieces (read-only) and the
+    curated question file; it never opens the user question log."""
+    cfg = load_config(args.config)
+    results = json.loads(Path(args.results).read_text(encoding="utf-8"))
+    if args.mode not in results.get("answers", {}):
+        print(f"mode {args.mode!r} has no answers in {args.results}", file=sys.stderr)
+        return 1
+    piece_text = {p.id: p.text for p in _store(cfg).load_pieces(cfg.project.slug)}
+    try:
+        items, skipped = items_from_results(results, load_questions(Path(args.data)), args.mode,
+                                            piece_text)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    provider = GeminiProvider(os.environ["GEMINI_API_KEY"], json_output=True)
+    verdicts = [judge_answer(i, provider) for i in items]
+    Path(args.out).write_text(json.dumps([asdict(v) for v in verdicts], indent=2),
+                              encoding="utf-8")
+    errors = sum(1 for v in verdicts if v.error)
+    print(f"judged {len(verdicts)} answers ({errors} judge errors, {skipped} rows skipped: "
+          "not answered or no saved text). UNCALIBRATED until judge-agreement has been run "
+          "against hand-graded labels.")
+    return 0
+
+
+def cmd_judge_agreement(args) -> int:
+    verdicts = [JudgeVerdict(**v)
+                for v in json.loads(Path(args.verdicts).read_text(encoding="utf-8"))]
+    a = agreement(verdicts, load_labels(Path(args.labels)))
+
+    def fmt(x):
+        return "n/a" if x is None else f"{x:.2f}"
+    print(f"compared {a['compared']} labelled answers "
+          f"({a['skipped_errors']} judge errors, {a['missing_verdicts']} without a verdict)")
+    print(f"precision {fmt(a['precision'])}  recall {fmt(a['recall'])}  "
+          f"(TP {a['true_positive']} FP {a['false_positive']} FN {a['false_negative']} "
+          f"TN {a['true_negative']})")
+    return 0
+
+
 def cmd_calibrate(args) -> int:
     """Print what each evidence threshold would do. Reads a saved file: no network, no neurons."""
     data = json.loads(Path(args.retrieval).read_text(encoding="utf-8"))
@@ -228,12 +273,22 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--host", default="127.0.0.1")
     v.add_argument("--port", type=int, default=8000)
     v.add_argument("--config", default=argparse.SUPPRESS)
+    j = sub.add_parser("judge")
+    j.add_argument("--results", required=True)
+    j.add_argument("--data", default="evals/data/dev.jsonl")
+    j.add_argument("--mode", default="hybrid")
+    j.add_argument("--out", required=True)
+    j.add_argument("--config", default=argparse.SUPPRESS)
+    g = sub.add_parser("judge-agreement")
+    g.add_argument("--verdicts", required=True)
+    g.add_argument("--labels", required=True)
     args = p.parse_args(argv)
     if args.cmd == "token" and args.action != "list" and not args.label:
         p.error(f"token {args.action} needs a LABEL")
     return {"ingest": cmd_ingest, "eval": cmd_eval, "calibrate": cmd_calibrate,
             "init-db": cmd_init_db, "token": cmd_token, "purge": cmd_purge,
-            "serve": cmd_serve}[args.cmd](args)
+            "serve": cmd_serve, "judge": cmd_judge,
+            "judge-agreement": cmd_judge_agreement}[args.cmd](args)
 
 
 if __name__ == "__main__":
