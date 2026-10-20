@@ -13,6 +13,7 @@ from typing import Literal
 
 from psycopg import errors
 
+from app.answer import BAD_CHARS
 from app.db import Db
 
 _LOCK_KEY = 7001  # advisory lock that serialises cap checks
@@ -169,6 +170,8 @@ class Usage:
             raise ValueError("rating must be 1 or -1")
         if comment is not None and len(comment) > _MAX_COMMENT:
             raise ValueError(f"comment longer than {_MAX_COMMENT} characters")
+        if comment is not None and BAD_CHARS.search(comment):
+            raise ValueError("comment contains characters that are not allowed")
         try:
             rid = str(uuid.UUID(request_id))
         except ValueError:

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.config import load_config
+from app.db import DbUnavailable
 from app.llm.base import Adapter, Completion, ProviderError
 from app.service import AnswerService, AskError
 from app.usage import CapHit, Reservation
@@ -239,3 +240,70 @@ def test_version_needs_no_database_and_shows_docs_ref_once_loaded():
     assert v["models"] == CFG.models.answer_order
     svc.ask("good", "what does & do?")
     assert svc.version()["docs_ref"] == "stable@abc1234567"
+
+
+class CutOffThenAnswer:
+    """Two providers in one: the first burns 40 neurons and fails, the second answers."""
+
+    def __init__(self):
+        self.providers = [self._cut(), Fake("It joins sheets [1].")]
+
+    @staticmethod
+    def _cut():
+        class CutOff:
+            name = "cutoff"
+
+            def complete(self, *a):
+                raise ProviderError("length", 200, neurons=40.0)
+        return CutOff()
+
+
+def test_neurons_of_failed_fallbacks_count_when_a_later_provider_answers():
+    usage, store = FakeUsage(), FakeStore()
+    svc = AnswerService(CFG, usage, store, lambda: Adapter(CutOffThenAnswer().providers),
+                        embed_query=lambda t: [0.0])
+    svc.ask("good", "what does & do?")
+    kw = usage.finished[0][1]
+    assert kw["status"] == "answered" and kw["llm_calls"] == 2
+    assert kw["neurons"] == pytest.approx(42.5)  # 40 burned by the failure + 2.5 by the answer
+
+
+@pytest.mark.parametrize("question", ["a\x00b", "\ud800", "ok \udfff"])
+def test_nul_and_lone_surrogates_are_a_400_not_a_database_crash(question):
+    svc, usage, *_ = make()
+    with pytest.raises(AskError) as e:
+        svc.ask("good", question)
+    assert e.value.status == 400 and usage.reserved == []
+
+
+def test_database_down_during_search_is_a_503_and_the_original_error_survives():
+    store = FakeStore()
+    store.vector_search = lambda *a: (_ for _ in ()).throw(DbUnavailable("down"))
+    usage = FakeUsage()
+    usage.finish = lambda *a, **k: (_ for _ in ()).throw(DbUnavailable("still down"))
+    svc, *_ = make(usage=usage, store=store)
+    with pytest.raises(AskError) as e:
+        svc.ask("good", "what does & do?")
+    assert e.value.status == 503
+
+
+def test_database_down_when_logging_the_answer_still_returns_the_answer():
+    usage = FakeUsage()
+    usage.finish = lambda *a, **k: (_ for _ in ()).throw(DbUnavailable("down"))
+    svc, *_ = make(usage=usage)
+    assert svc.ask("good", "what does & do?").status == "answered"
+
+
+def test_database_down_at_reserve_or_feedback_is_a_503():
+    usage = FakeUsage()
+    usage.reserve = lambda *a, **k: (_ for _ in ()).throw(DbUnavailable("down"))
+    svc, *_ = make(usage=usage)
+    with pytest.raises(AskError) as e:
+        svc.ask("good", "what does & do?")
+    assert e.value.status == 503
+    usage2 = FakeUsage()
+    usage2.add_feedback = lambda *a, **k: (_ for _ in ()).throw(DbUnavailable("down"))
+    svc2, *_ = make(usage=usage2)
+    with pytest.raises(AskError) as e:
+        svc2.feedback("good", "rid", 1, None)
+    assert e.value.status == 503

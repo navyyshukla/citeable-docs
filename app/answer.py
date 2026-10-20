@@ -110,12 +110,18 @@ def _citation(n: int, p: Piece) -> Citation:
     return Citation(n, " › ".join(p.heading_path), p.citation_url, p.docs_version, p.last_updated)
 
 
+# NUL and lone surrogates are valid JSON but cannot be stored in Postgres text (or UTF-8).
+BAD_CHARS = re.compile("[\x00\ud800-\udfff]")
+
+
 def validate_question(question: str, cfg: Config) -> str:
     q = question.strip()
     if not q:
         raise ValueError("question is empty")
     if len(q) > cfg.limits.max_question_chars:
         raise ValueError(f"question longer than {cfg.limits.max_question_chars} characters")
+    if BAD_CHARS.search(q):
+        raise ValueError("question contains characters that are not allowed")
     return q
 
 

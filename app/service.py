@@ -14,6 +14,9 @@ from app.usage import CapHit, Usage
 from ingest.models import Piece
 
 
+_DB_DOWN = "The database is waking up. Try again in a minute."
+
+
 class AskError(Exception):
     """An error the caller should see: HTTP status plus a safe message (never a stack trace)."""
 
@@ -64,8 +67,7 @@ class AnswerService:
                 self.store.check_ingest_meta(slug, self.cfg.models.embedding)
                 pieces = self.store.load_pieces(slug)
             except DbUnavailable as e:
-                raise AskError(503, "The database is waking up. Try again in a minute.",
-                               log=str(e)) from e
+                raise AskError(503, _DB_DOWN, log=str(e)) from e
             except ValueError as e:
                 raise AskError(503, "The docs index is not ready.", log=str(e)) from e
             if not pieces:
@@ -90,7 +92,7 @@ class AnswerService:
         try:
             tid = self.usage.token_id_for(token)
         except DbUnavailable as e:
-            raise AskError(503, "The database is waking up. Try again in a minute.") from e
+            raise AskError(503, _DB_DOWN) from e
         if tid is None:
             raise AskError(401, "Unknown or revoked invite link.")
         return tid
@@ -107,7 +109,7 @@ class AnswerService:
                                      lim.per_visitor_daily_cap, lim.global_daily_cap,
                                      lim.global_daily_neurons)
         except DbUnavailable as e:
-            raise AskError(503, "The database is waking up. Try again in a minute.") from e
+            raise AskError(503, _DB_DOWN) from e
         if isinstance(res, CapHit):
             wait = max(1, int((res.resets_at - datetime.now(timezone.utc)).total_seconds()))
             what = ("You have used your questions for today"
@@ -130,25 +132,37 @@ class AnswerService:
         except (AllProvidersFailed, ProviderError) as e:
             self._log_error(rid, str(e), index, adapter)
             raise AskError(503, "The answer models are busy. Try again in a minute.") from e
+        except DbUnavailable as e:
+            self._log_error(rid, str(e), index, adapter)
+            raise AskError(503, _DB_DOWN) from e
         except Exception as e:
             self._log_error(rid, f"{type(e).__name__}: {e}", index, adapter)
             raise
-        self.usage.finish(
-            rid, status=a.status, answer_text=a.text,
-            citations=[asdict(c) for c in a.citations], top_score=a.top_score,
-            provider=a.provider, model=a.model, neurons=a.neurons, llm_calls=a.llm_calls,
-            seconds=a.seconds, docs_ref=index.docs_ref, error=None)
+        try:
+            # Neurons of the whole request, not only the answering call: a provider that failed
+            # first (a cut-off reply) still burned quota, and the daily neuron cap must see it.
+            self.usage.finish(
+                rid, status=a.status, answer_text=a.text,
+                citations=[asdict(c) for c in a.citations], top_score=a.top_score,
+                provider=a.provider, model=a.model,
+                neurons=adapter.total_neurons if adapter.calls_made else None,
+                llm_calls=a.llm_calls, seconds=a.seconds, docs_ref=index.docs_ref, error=None)
+        except DbUnavailable:
+            pass  # the answer exists and its neurons are spent: return it; the row stays reserved
         return AskResult(rid, a.status, a.text, a.citations, a.closest, index.docs_ref,
                          index.docs_version, index.last_updated)
 
     def _log_error(self, request_id: str, error: str, index: _Index | None,
                    adapter: Adapter | None) -> None:
         # Failed attempts can still burn quota (a cut-off reply): keep it for the neuron cap.
-        self.usage.finish(
-            request_id, status="error", answer_text=None, citations=[], top_score=None,
-            provider=None, model=None, neurons=adapter.total_neurons if adapter else None,
-            llm_calls=adapter.calls_made if adapter else 0, seconds=None,
-            docs_ref=index.docs_ref if index else None, error=error[:500])
+        try:
+            self.usage.finish(
+                request_id, status="error", answer_text=None, citations=[], top_score=None,
+                provider=None, model=None, neurons=adapter.total_neurons if adapter else None,
+                llm_calls=adapter.calls_made if adapter else 0, seconds=None,
+                docs_ref=index.docs_ref if index else None, error=error[:500])
+        except DbUnavailable:
+            pass  # never let a failed log write hide the original error
 
     def feedback(self, token: str, request_id: str, rating: int, comment: str | None) -> None:
         token_id = self._token_id(token)
@@ -156,5 +170,7 @@ class AnswerService:
             ok = self.usage.add_feedback(token_id, request_id, rating, comment)
         except ValueError as e:
             raise AskError(400, str(e)) from e
+        except DbUnavailable as e:
+            raise AskError(503, _DB_DOWN) from e
         if not ok:
             raise AskError(404, "No such request.")
