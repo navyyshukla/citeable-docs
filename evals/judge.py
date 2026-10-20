@@ -29,7 +29,7 @@ class JudgeItem:
     question: str
     reference_answer: str | None
     answer: str
-    cited_texts: list[str]
+    excerpts: list[str]  # every excerpt the answerer was shown, in order: [n] means position n
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,7 @@ class HumanLabel:
 
 
 def _prompt(item: JudgeItem) -> str:
-    excerpts = "\n\n".join(f"[{n}] {t}" for n, t in enumerate(item.cited_texts, start=1))
+    excerpts = "\n\n".join(f"[{n}] {t}" for n, t in enumerate(item.excerpts, start=1))
     return (f"QUESTION:\n{item.question}\n\nREFERENCE:\n{item.reference_answer or '(none)'}\n\n"
             f"EXCERPTS:\n{excerpts or '(none)'}\n\nANSWER:\n{item.answer}")
 
@@ -86,6 +86,9 @@ def items_from_results(results: dict, questions: list[EvalQuestion], mode: str,
     unknown = sorted({r["id"] for r in rows} - set(by_id))
     if unknown:
         raise ValueError(f"results contain questions not in the curated file: {unknown}")
+    # The answer cites excerpts by their position among everything the model was shown (top-k
+    # hits in order), so the judge must see them numbered the same way, not only the cited ones.
+    sent = {r["id"]: r["top_ids"] for r in results.get("retrieval", {}).get(mode, [])}
     items, skipped = [], 0
     for r in rows:
         if r.get("status") != "answered" or not r.get("text"):
@@ -93,7 +96,8 @@ def items_from_results(results: dict, questions: list[EvalQuestion], mode: str,
             continue
         q = by_id[r["id"]]
         items.append(JudgeItem(q.id, q.question, q.reference_answer, r["text"],
-                               [piece_text[i] for i in r.get("cited_ids", []) if i in piece_text]))
+                               [piece_text[i] for i in sent.get(q.id, r.get("cited_ids", []))
+                                if i in piece_text]))
     return items, skipped
 
 

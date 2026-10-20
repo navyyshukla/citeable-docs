@@ -61,8 +61,11 @@ def q(i, text="a public paraphrase"):
                         split="dev", reference_answer="ref")
 
 
-def results(rows):
-    return {"meta": {"split": "dev"}, "answers": {"hybrid": rows}}
+def results(rows, retrieval=None):
+    out = {"meta": {"split": "dev"}, "answers": {"hybrid": rows}}
+    if retrieval is not None:
+        out["retrieval"] = {"hybrid": retrieval}
+    return out
 
 
 def row(i, status="answered", text="An answer [1].", cited=("p:0",)):
@@ -74,8 +77,24 @@ def test_items_come_from_answered_rows_with_text_only():
     items, skipped = items_from_results(results(rows), [q("a"), q("b"), q("c")], "hybrid",
                                         {"p:0": "piece text"})
     assert [i.question_id for i in items] == ["a"] and skipped == 2
-    assert items[0].cited_texts == ["piece text"] and items[0].reference_answer == "ref"
+    assert items[0].excerpts == ["piece text"] and items[0].reference_answer == "ref"
     assert items[0].question == "a public paraphrase"  # the question comes from the curated file
+
+
+def test_excerpts_are_numbered_as_the_answerer_saw_them_not_renumbered_from_the_citations():
+    # The model got 3 excerpts and cited only [3]. The judge must show all 3 in that order,
+    # or "[3]" points at nothing (a live run marked correct answers "not grounded" for this).
+    texts = {"a:0": "first", "b:0": "second", "c:0": "third"}
+    retrieval = [{"id": "a", "top_ids": ["a:0", "b:0", "c:0"], "top_scores": [3, 2, 1]}]
+    items, _ = items_from_results(results([row("a", cited=("c:0",))], retrieval), [q("a")],
+                                  "hybrid", texts)
+    assert items[0].excerpts == ["first", "second", "third"]
+
+
+def test_without_saved_retrieval_it_falls_back_to_the_cited_pieces():
+    items, _ = items_from_results(results([row("a", cited=("p:0",))]), [q("a")], "hybrid",
+                                  {"p:0": "piece text"})
+    assert items[0].excerpts == ["piece text"]
 
 
 def test_a_row_whose_question_is_not_in_the_curated_file_is_refused():
