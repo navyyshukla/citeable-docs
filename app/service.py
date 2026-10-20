@@ -79,6 +79,13 @@ class AnswerService:
                                  first.docs_version, first.last_updated)
             return self._index
 
+    def version(self) -> dict:
+        """What is being served. Never touches the database: docs_ref is None until the first
+        question has loaded the index."""
+        return {"project": self.cfg.project.slug,
+                "docs_ref": self._index.docs_ref if self._index else None,
+                "models": self.cfg.models.answer_order}
+
     def _token_id(self, token: str) -> int:
         try:
             tid = self.usage.token_id_for(token)

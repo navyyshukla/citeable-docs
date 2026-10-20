@@ -230,3 +230,12 @@ def test_neurons_burned_by_failed_attempts_are_logged_for_the_neuron_cap():
         svc.ask("good", "what does & do?")
     kw = usage.finished[0][1]
     assert kw["status"] == "error" and kw["neurons"] == 40.0 and kw["llm_calls"] == 1
+
+
+def test_version_needs_no_database_and_shows_docs_ref_once_loaded():
+    svc, _, store, *_ = make()
+    v = svc.version()
+    assert v["project"] == "visidata" and v["docs_ref"] is None and store.loads == 0
+    assert v["models"] == CFG.models.answer_order
+    svc.ask("good", "what does & do?")
+    assert svc.version()["docs_ref"] == "stable@abc1234567"
