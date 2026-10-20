@@ -64,7 +64,7 @@ class AnswerService:
                 return self._index
             slug = self.cfg.project.slug
             try:
-                self.store.check_ingest_meta(slug, self.cfg.models.embedding)
+                self.store.check_ingest_meta(slug, self.cfg.models.embedding, require=True)
                 pieces = self.store.load_pieces(slug)
             except DbUnavailable as e:
                 raise AskError(503, _DB_DOWN, log=str(e)) from e

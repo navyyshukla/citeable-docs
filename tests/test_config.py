@@ -59,3 +59,7 @@ def test_api_and_retention_settings_live_in_config():
     assert cfg.api.cors_origins, "the allowlist must not be empty"
     assert cfg.limits.global_daily_neurons == 8000
     assert cfg.limits.retention_days == 30
+
+
+def test_production_cors_list_has_only_https_origins():
+    assert all(o.startswith("https://") for o in load_config(CONFIG).api.cors_origins)

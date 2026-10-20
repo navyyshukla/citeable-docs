@@ -82,3 +82,11 @@ def test_smoke_fails_when_the_answer_cites_a_foreign_site():
     checks = smoke.run_checks(httpx.Client(transport=httpx.MockTransport(bad)),
                               "https://api.example", "good", "https://www.visidata.org/docs")
     assert not all(c.ok for c in checks)
+
+
+def test_smoke_takes_its_token_from_the_environment_not_the_command_line(monkeypatch, capsys):
+    smoke = load_smoke()
+    monkeypatch.delenv("SMOKE_TOKEN", raising=False)
+    assert smoke.main(["smoke.py", "https://api.example"]) == 2
+    assert "SMOKE_TOKEN" in capsys.readouterr().err
+    assert smoke.main(["smoke.py", "https://api.example", "tok"]) == 2  # no token in argv

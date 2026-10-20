@@ -44,4 +44,3 @@ models:
 api:
   cors_origins:
     - https://navyyshukla.github.io
-    - http://localhost:3000

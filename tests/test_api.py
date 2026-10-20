@@ -7,6 +7,7 @@ from app.config import load_config
 from app.service import AskError, AskResult
 
 CFG = load_config("config/visidata.yaml")
+TOKEN = "Ab3_-" * 8 + "xyz"  # 43 characters, the shape token_urlsafe(32) makes
 GOOD = "https://navyyshukla.github.io"
 BAD = "https://evil.example"
 
@@ -41,7 +42,7 @@ def client(svc):
     return TestClient(create_app(svc, CFG), raise_server_exceptions=False)
 
 
-def auth(token="good"):
+def auth(token=TOKEN):
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -61,7 +62,7 @@ def test_ask_happy_path_shape(client, svc):
                                     "url": "https://www.visidata.org/docs/join/",
                                     "docs_version": "3.0", "last_updated": "2026-01-01"}
     assert body["docs_ref"] == "stable@abc" and body["notice"] == CFG.project.license_note
-    assert svc.asked == [("good", "what does & do?")]
+    assert svc.asked == [(TOKEN, "what does & do?")]
 
 
 @pytest.mark.parametrize("kwargs", [
@@ -74,7 +75,7 @@ def test_ask_bad_body_is_4xx_and_never_reaches_the_service(client, svc, kwargs):
     headers = {**auth(), **kwargs.pop("headers", {})}
     r = client.post("/ask", headers=headers, **kwargs)
     assert 400 <= r.status_code < 500 and svc.asked == []
-    assert "good" not in r.text  # the token is never echoed
+    assert TOKEN not in r.text  # the token is never echoed
 
 
 def test_body_over_4kb_is_413(client, svc):
@@ -128,7 +129,7 @@ def test_feedback_happy_path(client, svc):
     r = client.post("/feedback", headers=auth(),
                     json={"request_id": "rid-1", "rating": -1, "comment": "wrong key"})
     assert r.status_code == 200 and r.json() == {"ok": True}
-    assert svc.feedbacks == [("good", "rid-1", -1, "wrong key")]
+    assert svc.feedbacks == [(TOKEN, "rid-1", -1, "wrong key")]
 
 
 @pytest.mark.parametrize("rating", [0, 2, "up", None])
@@ -154,3 +155,11 @@ def test_build_from_env_fails_fast_on_a_missing_key(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     with pytest.raises((ValueError, KeyError)):
         build_from_env()
+
+
+@pytest.mark.parametrize("junk", ["abc", "a" * 42, "a" * 44, "a" * 42 + "!", "a b" * 14 + "c"])
+def test_wrongly_shaped_token_is_401_without_calling_the_service(client, svc, junk):
+    r = client.post("/ask", json={"question": "hi"}, headers=auth(junk))
+    assert r.status_code == 401 and svc.asked == []
+    r = client.post("/feedback", json={"request_id": "r", "rating": 1}, headers=auth(junk))
+    assert r.status_code == 401 and svc.feedbacks == []

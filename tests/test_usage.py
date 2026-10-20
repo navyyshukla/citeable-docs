@@ -197,3 +197,32 @@ def test_no_ip_column(usage):
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_name IN ('questions','feedback','invite_tokens')").fetchall()]
     assert not [x for x in cols if "ip" in x.split("_") or "address" in x or "remote" in x]
+
+
+def test_an_old_orphan_reserved_row_stops_counting_but_a_fresh_one_still_does(usage):
+    tid = usage.token_id_for(usage.create_token("t-ann"))
+    old = reserve(usage, tid, per_visitor=1)
+    with usage.db.conn() as c:  # a restart mid-request left this row 'reserved' for ever
+        c.execute("UPDATE questions SET created_at = now() - interval '10 minutes' WHERE id = %s",
+                  (old.request_id,))
+    fresh = reserve(usage, tid, per_visitor=1)
+    assert isinstance(fresh, Reservation)  # the orphan did not use the visitor's only slot
+    assert isinstance(reserve(usage, tid, per_visitor=1), CapHit)  # the fresh one does
+
+
+def test_failed_questions_that_burned_neurons_count_for_that_visitor(usage):
+    a = usage.token_id_for(usage.create_token("t-a"))
+    b = usage.token_id_for(usage.create_token("t-b"))
+    r = reserve(usage, a, per_visitor=1)
+    finish(usage, r.request_id, status="error", neurons=40.0, answer=None)
+    hit = reserve(usage, a, per_visitor=1)
+    assert isinstance(hit, CapHit) and hit.kind == "visitor"
+    assert isinstance(reserve(usage, b, per_visitor=1), Reservation)  # others are unaffected
+
+
+def test_failed_questions_that_burned_nothing_stay_free(usage):
+    a = usage.token_id_for(usage.create_token("t-a"))
+    for neurons in (None, 0.0):
+        r = reserve(usage, a, per_visitor=1)
+        assert isinstance(r, Reservation)
+        finish(usage, r.request_id, status="error", neurons=neurons, answer=None)

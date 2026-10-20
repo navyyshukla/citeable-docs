@@ -5,6 +5,7 @@ restarts, and the log doubles as the held-out question set (decision D16: no Red
 """
 import hashlib
 import json
+import re
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -17,7 +18,23 @@ from app.answer import BAD_CHARS
 from app.db import Db
 
 _LOCK_KEY = 7001  # advisory lock that serialises cap checks
-_COUNTED = ("reserved", "answered", "abstained")  # 'error' rows (a provider outage) are free
+# A 'reserved' row that never finished (the process died mid-request) stops counting after this.
+_RESERVED_GRACE = "5 minutes"
+# What counts against a cap: answered and abstained questions, questions still in flight, and
+# failed questions that still burned neurons (else one visitor could drain the shared budget with
+# prompts that overrun the token cap). A failed question that burned nothing is free.
+_COUNTS = f"""(status IN ('answered', 'abstained')
+               OR (status = 'reserved' AND created_at > now() - interval '{_RESERVED_GRACE}')
+               OR (status = 'error' AND COALESCE(neurons, 0) > 0))"""
+# The shared request cap stays friendlier: failed questions are free there.
+_COUNTS_GLOBAL = f"""(status IN ('answered', 'abstained')
+               OR (status = 'reserved' AND created_at > now() - interval '{_RESERVED_GRACE}'))"""
+_TOKEN_SHAPE = re.compile(r"[A-Za-z0-9_-]{43}")  # what secrets.token_urlsafe(32) produces
+
+
+def looks_like_token(token: str) -> bool:
+    """Cheap check before any database call: junk tokens must not wake Neon."""
+    return _TOKEN_SHAPE.fullmatch(token) is not None
 _MAX_COMMENT = 500
 
 
@@ -131,13 +148,13 @@ class Usage:
         with self.db.conn() as c, c.transaction():
             c.execute("SELECT pg_advisory_xact_lock(%s)", (_LOCK_KEY,))
             (visitor,) = c.execute(
-                "SELECT count(*) FROM questions WHERE created_at >= %s AND token_id = %s "
-                "AND status = ANY(%s)", (start, token_id, list(_COUNTED))).fetchone()
+                f"SELECT count(*) FROM questions WHERE created_at >= %s AND token_id = %s "
+                f"AND {_COUNTS}", (start, token_id)).fetchone()
             if visitor >= per_visitor:
                 return CapHit("visitor", resets)
             (total,) = c.execute(
-                "SELECT count(*) FROM questions WHERE created_at >= %s AND status = ANY(%s)",
-                (start, list(_COUNTED))).fetchone()
+                f"SELECT count(*) FROM questions WHERE created_at >= %s AND {_COUNTS_GLOBAL}",
+                (start,)).fetchone()
             if total >= global_cap:
                 return CapHit("global", resets)
             # Neurons count from every row: a failed attempt can still burn quota.

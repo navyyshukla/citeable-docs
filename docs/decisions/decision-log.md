@@ -110,7 +110,11 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - **Database access:** `psycopg_pool` with a lazy open and a retried first connect; every failure to reach Neon (at open or later) becomes `DbUnavailable` -> HTTP 503; after a failed retry cycle callers fail fast for 30 s so queued requests do not each wait a full cycle. Alternatives: connection per request + retry (+1.5 s per question); load all pieces in memory (stale until restart, no growth path).
 - **Caps and logs:** Postgres tables, caps counted under an advisory lock so parallel requests cannot overshoot. Alternatives: in-memory counters (reset by every Render restart); Redis (rejected, D16).
 - **Judge:** built now (Gemini, public data only, reads saved eval results plus the curated question file, never the question log), calibrated later against about 25 hand-graded answers. Alternatives: defer to Plan 3; skip the judge.
-- **Owner's reasons:** not given yet (owner deferred, 2026-10-20). Fill in here.
+- **Owner's reasons (2026-10-20):**
+  - Access, invite token per friend: "In the beta an invite token per friend tells us who is using it, rather than guessing from their IP."
+  - Database access (pool + retry): *to be written by the owner.*
+  - Caps and logs (Postgres tables): *to be written by the owner.*
+  - Judge (build now, calibrate later): *to be written by the owner.*
 - **Claude's calls (not confirmed by the owner):** third cap of 8,000 neurons/day (the real quota is neurons); 30-day retention with a manual `purge`; a request where every provider fails is free for the request caps but its burned neurons count toward the neuron cap; sync endpoints in a thread pool, no streaming, no answer cache until the beta shows repeats.
 
 ## D20. Evidence threshold is a weak dial; provisional 0.020 (2026-10-20)

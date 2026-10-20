@@ -57,7 +57,8 @@ class FakeStore:
         self.pieces, self.vector_hits, self.model_ok = pieces, list(vector_hits), model_ok
         self.loads = 0
 
-    def check_ingest_meta(self, project, model):
+    def check_ingest_meta(self, project, model, require=False):
+        self.required = require
         if not self.model_ok:
             raise ValueError("pieces were embedded with 'old' but the config says 'new'")
 
@@ -307,3 +308,9 @@ def test_database_down_at_reserve_or_feedback_is_a_503():
     with pytest.raises(AskError) as e:
         svc2.feedback("good", "rid", 1, None)
     assert e.value.status == 503
+
+
+def test_the_service_demands_an_ingest_meta_row_before_serving():
+    svc, usage, store, *_ = make()
+    svc.ask("good", "what does & do?")
+    assert store.required is True

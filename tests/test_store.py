@@ -186,3 +186,12 @@ def test_ingest_meta_is_replaced_not_duplicated():
     store.write_ingest_meta("t", "model-a", 4, "stable@abc")
     store.write_ingest_meta("t", "model-b", 4, "stable@def")
     store.check_ingest_meta("t", "model-b")
+
+
+def test_ingest_meta_required_mode_refuses_when_nothing_was_ingested():
+    store = Store(Db(DSN), dim=4)
+    store.init_schema()
+    with pytest.raises(ValueError, match="ingest"):
+        store.check_ingest_meta("t", "model-a", require=True)
+    store.write_ingest_meta("t", "model-a", 4, "stable@abc")
+    store.check_ingest_meta("t", "model-a", require=True)

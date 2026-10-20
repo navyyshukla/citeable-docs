@@ -113,12 +113,17 @@ class Store:
                        dim = EXCLUDED.dim, docs_ref = EXCLUDED.docs_ref, ingested_at = now()""",
                 (project, embedding_model, dim, docs_ref))
 
-    def check_ingest_meta(self, project: str, embedding_model: str) -> None:
+    def check_ingest_meta(self, project: str, embedding_model: str,
+                          require: bool = False) -> None:
         """Two embedding models can share a vector size, so the size check alone cannot tell
-        that the stored vectors came from a different model than the one embedding queries."""
+        that the stored vectors came from a different model than the one embedding queries.
+        `require`: refuse when nothing was ever recorded (the API sets it; the first ingest
+        cannot)."""
         with self.db.conn() as c:
             row = c.execute("SELECT embedding_model FROM ingest_meta WHERE project = %s",
                             (project,)).fetchone()
+        if require and not row:
+            raise ValueError(f"no ingest_meta row for {project!r}; run `ingest` first")
         if row and row[0] != embedding_model:
             raise ValueError(f"pieces were embedded with {row[0]!r} but the config says "
                              f"{embedding_model!r}; re-ingest with --allow-model-change")

@@ -17,10 +17,10 @@ The service is defined in `render.yaml`. Secrets are set in the Render dashboard
 ## First deploy order (production database)
 
 1. `python -m app.cli init-db` (creates the usage tables; pieces already exist).
-2. `python -m app.cli ingest` (re-embeds about 229 pieces, spends Cloudflare neurons, writes
+2. `python -m app.cli ingest` (required: the API refuses to serve until the `ingest_meta` row exists; re-embeds about 229 pieces, spends Cloudflare neurons, writes
    `ingest_meta` and the new `docs_ref`). Ask before running.
 3. `python -m app.cli token create owner-test` and copy the token once.
-4. `python scripts/smoke.py https://<service>.onrender.com <token>`; paste the timings below.
+4. `SMOKE_TOKEN=<token> python scripts/smoke.py https://<service>.onrender.com`; paste the timings below. (The token is read from the environment so it stays out of shell history. The two smoke questions are written to the question log and count against that token's cap.)
 
 ## Measured on first deploy (fill in)
 
@@ -44,3 +44,8 @@ The service is defined in `render.yaml`. Secrets are set in the Render dashboard
 
 The running service keeps the pieces it loaded at its first question. After `ingest`, restart the
 service (dashboard -> Manual Deploy -> Restart) so it reloads them.
+
+## Local front-end development
+
+`localhost` is not in the production CORS list (`api.cors_origins`). Plan 3 adds a local origin when
+the chat page is developed, and removes it before the beta.

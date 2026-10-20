@@ -16,7 +16,7 @@ from app.llm.build import build_adapter
 from app.llm.cloudflare import CloudflareClient, embed_texts
 from app.service import AnswerService, AskError, AskResult
 from app.store import Store
-from app.usage import Usage
+from app.usage import Usage, looks_like_token
 
 MAX_BODY_BYTES = 4096
 
@@ -35,7 +35,10 @@ def _token(request: Request) -> str:
     scheme, _, token = request.headers.get("authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
         raise AskError(401, "Missing invite token.", headers={"WWW-Authenticate": "Bearer"})
-    return token.strip()
+    token = token.strip()
+    if not looks_like_token(token):  # no database call for junk: it would wake Neon
+        raise AskError(401, "Unknown or revoked invite link.")
+    return token
 
 
 async def _json_body(request: Request) -> dict:

@@ -1,8 +1,12 @@
-"""Post-deploy check of a live API: python scripts/smoke.py URL TOKEN
+"""Post-deploy check of a live API: SMOKE_TOKEN=<token> python scripts/smoke.py URL
+
+The token comes from the environment, not the command line: arguments end up in shell history
+and the process list.
 
 Makes two real /ask calls (a few Cloudflare neurons at most) and prints how long each step took,
 so cold-start and warm times are measured, not guessed.
 """
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -68,12 +72,13 @@ def run_checks(client: httpx.Client, base: str, token: str, site: str) -> list[C
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        print("usage: python scripts/smoke.py URL TOKEN", file=sys.stderr)
+    token = os.environ.get("SMOKE_TOKEN")
+    if len(argv) != 2 or not token:
+        print("usage: SMOKE_TOKEN=<token> python scripts/smoke.py URL", file=sys.stderr)
         return 2
     from app.config import load_config
     site = load_config("config/visidata.yaml").project.site_base_url
-    checks = run_checks(httpx.Client(timeout=120), argv[1].rstrip("/"), argv[2], site)
+    checks = run_checks(httpx.Client(timeout=120), argv[1].rstrip("/"), token, site)
     for c in checks:
         print(f"{'PASS' if c.ok else 'FAIL'}  {c.seconds:6.1f}s  {c.name}  {c.detail}")
     return 0 if all(c.ok for c in checks) else 1
