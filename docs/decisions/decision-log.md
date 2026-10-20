@@ -112,9 +112,9 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - **Judge:** built now (Gemini, public data only, reads saved eval results plus the curated question file, never the question log), calibrated later against about 25 hand-graded answers. Alternatives: defer to Plan 3; skip the judge.
 - **Owner's reasons (2026-10-20):**
   - Access, invite token per friend: "In the beta an invite token per friend tells us who is using it, rather than guessing from their IP."
-  - Database access (pool + retry): *to be written by the owner.*
-  - Caps and logs (Postgres tables): *to be written by the owner.*
-  - Judge (build now, calibrate later): *to be written by the owner.*
+  - Database access (pool + retry): "A connection per question will not be feasible, and loading all the docs in memory might result in a single point of failure." (Claude's note: the service already keeps the pieces in memory for the keyword search, loaded once. What was rejected is serving everything from memory: it is lost on every Render restart, goes stale after an ingest, and the vectors would not scale. The database stays the source of truth, so the pool is the right tool for the per-question work.)
+  - Caps and logs (Postgres tables): "The answer is in the question itself: a Render restart would reset in-memory caps, and they could be bypassed."  (Claude's note: Render's free service also sleeps after 15 idle minutes, which resets memory the same way.)
+  - Judge (build now, calibrate later): "Build now so that I can see how it works before Plan 3." (Claude's note: seeing it work needs the pending approvals: production ingest, then a live run.)
 - **Claude's calls (not confirmed by the owner):** third cap of 8,000 neurons/day (the real quota is neurons); 30-day retention with a manual `purge`; a request where every provider fails is free for the request caps but its burned neurons count toward the neuron cap; sync endpoints in a thread pool, no streaming, no answer cache until the beta shows repeats.
 
 ## D20. Evidence threshold is a weak dial; provisional 0.020 (2026-10-20)
