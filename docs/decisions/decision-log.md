@@ -104,3 +104,16 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - Why (assistant's reasoning, owner gave no separate reason): the baseline should measure the answers users get; Gemini answers would describe Gemini. Resolves the open item in D14/D15 for Task 15. Gemini stays for the AI judge in Plan 2, on public data only.
 - Alternative rejected: build a Gemini provider and run the baseline there (more code, measures the wrong model).
 - Cost if wrong: the baseline spends up to 1,500 neurons of the 10,000/day free allocation.
+
+## D19. Plan 2 backend choices (2026-10-20)
+- **Access:** invite token per friend, only its SHA-256 hash stored (32 random bytes, so a fast hash is enough). Alternatives: open API with hashed IP (shared IPs share a cap; strangers can burn the global cap); one shared password (no per-person cap; one leak ends the beta).
+- **Database access:** `psycopg_pool` with a lazy open and a retried first connect; every failure to reach Neon (at open or later) becomes `DbUnavailable` -> HTTP 503; after a failed retry cycle callers fail fast for 30 s so queued requests do not each wait a full cycle. Alternatives: connection per request + retry (+1.5 s per question); load all pieces in memory (stale until restart, no growth path).
+- **Caps and logs:** Postgres tables, caps counted under an advisory lock so parallel requests cannot overshoot. Alternatives: in-memory counters (reset by every Render restart); Redis (rejected, D16).
+- **Judge:** built now (Gemini, public data only, reads saved eval results plus the curated question file, never the question log), calibrated later against about 25 hand-graded answers. Alternatives: defer to Plan 3; skip the judge.
+- **Owner's reasons:** not given yet (owner deferred, 2026-10-20). Fill in here.
+- **Claude's calls (not confirmed by the owner):** third cap of 8,000 neurons/day (the real quota is neurons); 30-day retention with a manual `purge`; a request where every provider fails is free for the request caps but its burned neurons count toward the neuron cap; sync endpoints in a thread pool, no streaming, no answer cache until the beta shows repeats.
+
+## D20. Evidence threshold is a weak dial; provisional 0.020 (2026-10-20)
+- Measured on 28 dev questions (`docs/evals/threshold-2026-10-20.md`): no single score separates answerable from unanswerable questions (5 of 9 unanswerable score 0.0323 or more on hybrid, the same as answerable ones), because the fusion score comes from ranks. Abstaining therefore rests mainly on the model's `NOT_IN_DOCS` answer.
+- Value 0.020 = the best piece must be found by both searches (a one-search rank-1 hit scores at most 0.0164). It cost no answerable question on the dev set and saves a model call on clearly off-topic questions. Applied only to hybrid.
+- Owner may override. Revisit with friends' questions (the `questions` table is the held-out set).
