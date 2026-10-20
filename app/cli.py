@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 
 from app.config import load_config
+from app.db import Db
 from app.llm.build import build_adapter
 from app.llm.cloudflare import CloudflareClient, embed_texts
 from app.search import Searcher
@@ -22,7 +23,7 @@ MIN_PIECES = 100  # the real docs give about 230; fewer means a broken download 
 
 
 def _store(cfg) -> Store:
-    return Store(os.environ["DATABASE_URL"], cfg.models.embedding_dim,
+    return Store(Db(os.environ["DATABASE_URL"]), cfg.models.embedding_dim,
                  vector_index=cfg.search.vector_index)
 
 
@@ -41,6 +42,12 @@ def cmd_ingest(args) -> int:
         return 0
     store = _store(cfg)
     store.init_schema()
+    if not args.allow_model_change:
+        try:
+            store.check_ingest_meta(cfg.project.slug, cfg.models.embedding)
+        except ValueError as e:
+            print(f"refusing to replace: {e}", file=sys.stderr)
+            return 1
     # An empty or tiny parse must never delete the stored pieces (cold review of Tasks 6-9),
     # and neither may a parse that lost whole pages (cold review #2).
     stored = store.load_pieces(cfg.project.slug)
@@ -59,6 +66,8 @@ def cmd_ingest(args) -> int:
     vectors = embed_texts(cf, cfg.models.embedding, [p.search_text for p in pieces],
                           cfg.models.embedding_batch)
     store.replace_project_pieces(cfg.project.slug, pieces, vectors)
+    store.write_ingest_meta(cfg.project.slug, cfg.models.embedding, cfg.models.embedding_dim,
+                            docs_ref)
     print(f"stored {len(pieces)} pieces for project {cfg.project.slug}")
     return 0
 
@@ -116,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     i = sub.add_parser("ingest")
     i.add_argument("--dry-run", action="store_true")
     i.add_argument("--allow-shrink", action="store_true")
+    i.add_argument("--allow-model-change", action="store_true")
     i.add_argument("--config", default=argparse.SUPPRESS)
     e = sub.add_parser("eval")
     e.add_argument("--split", default="dev")

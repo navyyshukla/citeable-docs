@@ -1,6 +1,5 @@
 """Postgres + pgvector storage for pieces."""
-import psycopg
-
+from app.db import Db
 from ingest.models import Piece
 
 
@@ -13,17 +12,13 @@ _VECTOR_INDEXES = ("none", "hnsw")
 
 
 class Store:
-    def __init__(self, dsn: str, dim: int, vector_index: str = "none"):
+    def __init__(self, db: Db, dim: int, vector_index: str = "none"):
         if vector_index not in _VECTOR_INDEXES:
             raise ValueError(f"vector_index must be one of {_VECTOR_INDEXES}, got {vector_index!r}")
-        self.dsn, self.dim, self.vector_index = dsn, dim, vector_index
-
-    def _conn(self) -> psycopg.Connection:
-        # Neon free suspends after idle time; the first connection can take a while to wake it
-        return psycopg.connect(self.dsn, connect_timeout=60)
+        self.db, self.dim, self.vector_index = db, dim, vector_index
 
     def init_schema(self) -> None:
-        with self._conn() as c:
+        with self.db.conn() as c:
             c.execute("CREATE EXTENSION IF NOT EXISTS vector")
             c.execute(f"""
                 CREATE TABLE IF NOT EXISTS pieces (
@@ -51,6 +46,12 @@ class Store:
                 raise ValueError(
                     f"pieces.embedding has dimension {have} but the config says {self.dim}; "
                     "re-create the table to change the embedding size")
+            c.execute("""CREATE TABLE IF NOT EXISTS ingest_meta (
+                project TEXT PRIMARY KEY,
+                embedding_model TEXT NOT NULL,
+                dim INT NOT NULL,
+                docs_ref TEXT NOT NULL,
+                ingested_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
             # The configured setting is the wanted state: create the index, or drop it when off.
             if self.vector_index == "hnsw":
                 c.execute(f"CREATE INDEX IF NOT EXISTS {_INDEX_NAME} "
@@ -63,7 +64,7 @@ class Store:
         if len(pieces) != len(embeddings):
             raise ValueError(f"{len(pieces)} pieces but {len(embeddings)} embeddings")
         # One transaction: if any insert fails, the delete is rolled back and the old pieces stay.
-        with self._conn() as c:
+        with self.db.conn() as c:
             c.execute("DELETE FROM pieces WHERE project = %s", (project,))
             with c.cursor() as cur:
                 cur.executemany(
@@ -78,7 +79,7 @@ class Store:
                 )
 
     def load_pieces(self, project: str) -> list[Piece]:
-        with self._conn() as c:
+        with self.db.conn() as c:
             rows = c.execute(
                 """SELECT id, page_slug, page_title, url, anchor, anchor_explicit, heading_path,
                           text, docs_ref, docs_version, last_updated
@@ -88,7 +89,7 @@ class Store:
                       docs_version=r[9], last_updated=r[10]) for r in rows]
 
     def vector_search(self, project: str, embedding: list[float], k: int) -> list[tuple[str, float]]:
-        with self._conn() as c, c.transaction():
+        with self.db.conn() as c, c.transaction():
             if self.vector_index == "hnsw":
                 # Per-query index settings must be SET LOCAL inside this transaction: Neon's pooler
                 # shares sessions, so a plain SET could leak to, or vanish from, another query.
@@ -101,3 +102,23 @@ class Store:
                    ORDER BY embedding <=> %s::vector LIMIT %s""",
                 (_vec(embedding), project, _vec(embedding), k)).fetchall()
         return [(r[0], float(r[1])) for r in rows]
+
+    def write_ingest_meta(self, project: str, embedding_model: str, dim: int,
+                          docs_ref: str) -> None:
+        with self.db.conn() as c:
+            c.execute(
+                """INSERT INTO ingest_meta (project, embedding_model, dim, docs_ref)
+                   VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (project) DO UPDATE SET embedding_model = EXCLUDED.embedding_model,
+                       dim = EXCLUDED.dim, docs_ref = EXCLUDED.docs_ref, ingested_at = now()""",
+                (project, embedding_model, dim, docs_ref))
+
+    def check_ingest_meta(self, project: str, embedding_model: str) -> None:
+        """Two embedding models can share a vector size, so the size check alone cannot tell
+        that the stored vectors came from a different model than the one embedding queries."""
+        with self.db.conn() as c:
+            row = c.execute("SELECT embedding_model FROM ingest_meta WHERE project = %s",
+                            (project,)).fetchone()
+        if row and row[0] != embedding_model:
+            raise ValueError(f"pieces were embedded with {row[0]!r} but the config says "
+                             f"{embedding_model!r}; re-ingest with --allow-model-change")

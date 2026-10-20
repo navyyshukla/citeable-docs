@@ -19,6 +19,14 @@ class FakeStore:
     """Stands in for Store; records whether the replace was attempted."""
     def __init__(self, stored: int, pages: tuple = ("p",)):
         self.stored, self.pages, self.replaced = stored, pages, False
+        self.model_ok, self.meta = True, None
+
+    def check_ingest_meta(self, project, model):
+        if not self.model_ok:
+            raise ValueError("pieces were embedded with 'old' but the config says 'new'")
+
+    def write_ingest_meta(self, project, model, dim, docs_ref):
+        self.meta = (project, model, dim, docs_ref)
 
     def init_schema(self):
         pass
@@ -63,6 +71,33 @@ def test_ingest_replaces_when_count_is_plausible(monkeypatch):
     _wire(monkeypatch, store)
     monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
     assert main(["ingest"]) == 0
+    assert store.replaced
+
+
+def test_ingest_writes_meta_after_replace(monkeypatch):
+    store = FakeStore(stored=120)
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest"]) == 0
+    assert store.meta[0] == "visidata" and store.meta[3] == f"stable@{SHA[:10]}"
+
+
+def test_ingest_refuses_changed_embedding_model(monkeypatch, capsys):
+    store = FakeStore(stored=120)
+    store.model_ok = False
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest"]) == 1
+    assert not store.replaced
+    assert "embedded with" in capsys.readouterr().err
+
+
+def test_allow_model_change_skips_the_check(monkeypatch):
+    store = FakeStore(stored=120)
+    store.model_ok = False
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest", "--allow-model-change"]) == 0
     assert store.replaced
 
 
