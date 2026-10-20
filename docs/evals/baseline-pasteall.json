@@ -1,0 +1,65 @@
+[
+ {
+  "id": "r-002",
+  "answerable": true,
+  "status": "answered",
+  "citations": [
+   "18",
+   "19"
+  ],
+  "invalid_citations": [],
+  "neurons": 351.6272888183594,
+  "seconds": 7.914659332949668,
+  "model": "cloudflare:@cf/google/gemma-4-26b-a4b-it",
+  "pieces_sent": 229
+ },
+ {
+  "id": "r-008",
+  "answerable": true,
+  "status": "answered",
+  "citations": [
+   "62"
+  ],
+  "invalid_citations": [],
+  "neurons": 344.0636291503906,
+  "seconds": 5.031140374951065,
+  "model": "cloudflare:@cf/google/gemma-4-26b-a4b-it",
+  "pieces_sent": 229
+ },
+ {
+  "id": "d-003",
+  "answerable": true,
+  "status": "answered",
+  "citations": [
+   "122",
+   "149"
+  ],
+  "invalid_citations": [],
+  "neurons": 345.5818176269531,
+  "seconds": 6.32091295812279,
+  "model": "cloudflare:@cf/google/gemma-4-26b-a4b-it",
+  "pieces_sent": 229
+ },
+ {
+  "id": "g-002",
+  "answerable": false,
+  "status": "abstained",
+  "citations": [],
+  "invalid_citations": [],
+  "neurons": 343.3636474609375,
+  "seconds": 4.841733375098556,
+  "model": "cloudflare:@cf/google/gemma-4-26b-a4b-it",
+  "pieces_sent": 229
+ },
+ {
+  "id": "t-002",
+  "answerable": false,
+  "status": "abstained",
+  "citations": [],
+  "invalid_citations": [],
+  "neurons": 343.31817626953125,
+  "seconds": 4.250179958064109,
+  "model": "cloudflare:@cf/google/gemma-4-26b-a4b-it",
+  "pieces_sent": 229
+ }
+]

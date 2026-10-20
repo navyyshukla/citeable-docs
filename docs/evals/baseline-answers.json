@@ -1,0 +1,1518 @@
+{
+  "meta": {
+    "split": "dev",
+    "n_questions": 24,
+    "ref": "stable",
+    "modes": [
+      "meaning",
+      "hybrid"
+    ],
+    "answered": true,
+    "stopped_early": {
+      "meaning": false,
+      "hybrid": false
+    },
+    "total_neurons": 614.645429611206,
+    "embedding_model": "@cf/baai/bge-base-en-v1.5"
+  },
+  "retrieval": {
+    "meaning": [
+      {
+        "id": "r-001",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:2",
+          "columns:1",
+          "dirsheet:1",
+          "columns:20",
+          "columns:18"
+        ],
+        "top_scores": [
+          0.7808954159110977,
+          0.7664370604306844,
+          0.7068279690493325,
+          0.7065292906588926,
+          0.6879589883663236
+        ]
+      },
+      {
+        "id": "r-002",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:14",
+          "navigate:1",
+          "edit:0",
+          "move:0",
+          "rows:5"
+        ],
+        "top_scores": [
+          0.7368567475531614,
+          0.6980955756987777,
+          0.6938786492699552,
+          0.6634624121406036,
+          0.6630012776402552
+        ]
+      },
+      {
+        "id": "r-003",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "rows:5",
+          "rows:4",
+          "crud:2",
+          "rows:1",
+          "rows:2"
+        ],
+        "top_scores": [
+          0.83433311998876,
+          0.7886673878617447,
+          0.6585740845895823,
+          0.6547491345856109,
+          0.6529180804757305
+        ]
+      },
+      {
+        "id": "r-004",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": false,
+        "top_ids": [
+          "save-restore:2",
+          "save-restore:0",
+          "columns:6",
+          "save-restore:1",
+          "formats:10"
+        ],
+        "top_scores": [
+          0.7131810591995504,
+          0.701985544688118,
+          0.6765014007686424,
+          0.6613451498521103,
+          0.6534408847917281
+        ]
+      },
+      {
+        "id": "r-005",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:12",
+          "columns:9",
+          "columns:6",
+          "columns:8",
+          "columns:3"
+        ],
+        "top_scores": [
+          0.7698674419529506,
+          0.7646202847200679,
+          0.7582051714843521,
+          0.7529528795953525,
+          0.7386000492433265
+        ]
+      },
+      {
+        "id": "r-006",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:12",
+          "columns:6",
+          "columns:8",
+          "columns:9",
+          "columns:4"
+        ],
+        "top_scores": [
+          0.760138106118002,
+          0.7456080551492217,
+          0.734945524878049,
+          0.731049919834336,
+          0.7240060444272218
+        ]
+      },
+      {
+        "id": "r-007",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "colors:9",
+          "colors:11",
+          "colors:10",
+          "columns:16",
+          "navigate:1"
+        ],
+        "top_scores": [
+          0.7350967884019196,
+          0.7227048714990352,
+          0.7022283209082246,
+          0.6689329729848367,
+          0.6653560408902097
+        ]
+      },
+      {
+        "id": "r-008",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "dirsheet:7",
+          "dirsheet:6",
+          "dirsheet:1",
+          "loading:1",
+          "macros:3"
+        ],
+        "top_scores": [
+          0.745736367410877,
+          0.6505896143844284,
+          0.6499650848628069,
+          0.6494510368659685,
+          0.6424121689672974
+        ]
+      },
+      {
+        "id": "r-009",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "colors:6",
+          "colors:0",
+          "menu:4",
+          "colors:7",
+          "colors:4"
+        ],
+        "top_scores": [
+          0.6933361046922498,
+          0.6677611224364775,
+          0.6663679346391546,
+          0.6530298099594403,
+          0.6496256549284928
+        ]
+      },
+      {
+        "id": "r-010",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "join:0",
+          "group:9",
+          "index:3",
+          "freq:4",
+          "edit:1"
+        ],
+        "top_scores": [
+          0.7276130001824557,
+          0.6990703704472936,
+          0.6743921905351078,
+          0.6711624958588835,
+          0.66848047718377
+        ]
+      },
+      {
+        "id": "g-001",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "columns:13",
+          "columns:18",
+          "rows:14",
+          "columns:21",
+          "group:9"
+        ],
+        "top_scores": [
+          0.7029063056759596,
+          0.693436937825037,
+          0.6901707012820503,
+          0.6884334367045888,
+          0.6854132045130085
+        ]
+      },
+      {
+        "id": "g-002",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "dirsheet:3",
+          "usage:1",
+          "customize:9",
+          "mouse:0",
+          "plugins:5"
+        ],
+        "top_scores": [
+          0.6442922811202656,
+          0.644160011929901,
+          0.6316935183798096,
+          0.6257916903781937,
+          0.625699272277182
+        ]
+      },
+      {
+        "id": "g-003",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "rows:7",
+          "rows:8",
+          "edit:0",
+          "save-restore:2",
+          "dirsheet:9"
+        ],
+        "top_scores": [
+          0.7438541446649161,
+          0.7169698263395413,
+          0.6821488419498427,
+          0.6724887922282418,
+          0.6584267528427745
+        ]
+      },
+      {
+        "id": "g-004",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "macros:0",
+          "macros:3",
+          "save-restore:2",
+          "customize:4",
+          "usage:1"
+        ],
+        "top_scores": [
+          0.7228602349809236,
+          0.6952375129761539,
+          0.6798176533403498,
+          0.6598298587947906,
+          0.6557016761574764
+        ]
+      },
+      {
+        "id": "g-005",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "usage:1",
+          "customize:9",
+          "customize:4",
+          "mouse:0",
+          "navigate:6"
+        ],
+        "top_scores": [
+          0.7662443560642936,
+          0.7318317625449453,
+          0.7147546285223759,
+          0.7035295751743857,
+          0.6936658164450662
+        ]
+      },
+      {
+        "id": "d-001",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "rows:11",
+          "rows:13",
+          "rows:10",
+          "rows:12",
+          "columns:8"
+        ],
+        "top_scores": [
+          0.8258417578440337,
+          0.7110133774525257,
+          0.6925192864306645,
+          0.6772941509106518,
+          0.6660658313268967
+        ]
+      },
+      {
+        "id": "d-002",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "loading:1",
+          "usage:0",
+          "formats:17",
+          "loading:6",
+          "save-restore:2"
+        ],
+        "top_scores": [
+          0.7269183397491107,
+          0.7195216136679653,
+          0.7131837411209212,
+          0.6999365425778745,
+          0.6900510064577803
+        ]
+      },
+      {
+        "id": "d-003",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "freq:7",
+          "group:3",
+          "freq:8",
+          "freq:2",
+          "columns:13"
+        ],
+        "top_scores": [
+          0.7606979401893947,
+          0.7403034511334412,
+          0.7358280956296112,
+          0.7009902193385051,
+          0.6836050236253728
+        ]
+      },
+      {
+        "id": "d-004",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "edit:7",
+          "edit:5",
+          "dirsheet:6",
+          "columns:18",
+          "columns:14"
+        ],
+        "top_scores": [
+          0.8202517907987124,
+          0.7790423613781682,
+          0.721922830351605,
+          0.7042213747135375,
+          0.7037868489434007
+        ]
+      },
+      {
+        "id": "d-005",
+        "mode": "meaning",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "save-restore:2",
+          "save-restore:0",
+          "save-restore:1",
+          "formats:1",
+          "test:0"
+        ],
+        "top_scores": [
+          0.7261453272462061,
+          0.6557923094116644,
+          0.6407137492019296,
+          0.6347688839812371,
+          0.6308441293646969
+        ]
+      },
+      {
+        "id": "t-001",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "formats:12",
+          "formats:9",
+          "colors:9",
+          "formats:11",
+          "formats:2"
+        ],
+        "top_scores": [
+          0.5132880826665831,
+          0.5121762829316256,
+          0.5103056407946933,
+          0.49964006449701426,
+          0.49856447707818996
+        ]
+      },
+      {
+        "id": "t-002",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "usage:1",
+          "customize:4",
+          "save-restore:2",
+          "menu:3",
+          "navigate:3"
+        ],
+        "top_scores": [
+          0.6237602318880618,
+          0.5723360458248358,
+          0.5695209061822424,
+          0.5638939424518454,
+          0.5540818350475836
+        ]
+      },
+      {
+        "id": "t-003",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "formats:15",
+          "formats:12",
+          "formats:6",
+          "formats:2",
+          "formats:9"
+        ],
+        "top_scores": [
+          0.765786600202641,
+          0.759220985808965,
+          0.7569532694580059,
+          0.7569036063590063,
+          0.755638323777148
+        ]
+      },
+      {
+        "id": "t-004",
+        "mode": "meaning",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "split:0",
+          "customize:5",
+          "columns:20",
+          "edit:1",
+          "index:3"
+        ],
+        "top_scores": [
+          0.7593031071476711,
+          0.7540758416366878,
+          0.750182432747014,
+          0.7390728802106954,
+          0.7371384601024901
+        ]
+      }
+    ],
+    "hybrid": [
+      {
+        "id": "r-001",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": false,
+        "top_ids": [
+          "columns:18",
+          "columns:20",
+          "columns:21",
+          "columns:5",
+          "rows:5"
+        ],
+        "top_scores": [
+          0.0315136476426799,
+          0.030776515151515152,
+          0.027809742999616416,
+          0.027212143650499815,
+          0.0259915611814346
+        ]
+      },
+      {
+        "id": "r-002",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:14",
+          "move:0",
+          "edit:0",
+          "navigate:1",
+          "rows:5"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.031754032258064516,
+          0.031746031746031744,
+          0.029827662395050816,
+          0.02946912242686891
+        ]
+      },
+      {
+        "id": "r-003",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "rows:5",
+          "rows:4",
+          "columns:18",
+          "freq:3",
+          "rows:2"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.03225806451612903,
+          0.03036576949620428,
+          0.02900988017658188,
+          0.0288981288981289
+        ]
+      },
+      {
+        "id": "r-004",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": false,
+        "top_ids": [
+          "loading:1",
+          "save-restore:0",
+          "columns:6",
+          "columns:18",
+          "columns:10"
+        ],
+        "top_scores": [
+          0.031544957774465976,
+          0.03021353930031804,
+          0.02976190476190476,
+          0.0293236301369863,
+          0.027912386121341344
+        ]
+      },
+      {
+        "id": "r-005",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:12",
+          "columns:6",
+          "columns:8",
+          "columns:9",
+          "columns:18"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.031746031746031744,
+          0.03125,
+          0.029827662395050816,
+          0.02964426877470356
+        ]
+      },
+      {
+        "id": "r-006",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "columns:12",
+          "columns:4",
+          "columns:9",
+          "columns:3",
+          "columns:8"
+        ],
+        "top_scores": [
+          0.03177805800756621,
+          0.03125763125763126,
+          0.03125,
+          0.031054405392392875,
+          0.029030910609857977
+        ]
+      },
+      {
+        "id": "r-007",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "colors:11",
+          "colors:9",
+          "colors:10",
+          "rows:5",
+          "columns:16"
+        ],
+        "top_scores": [
+          0.03252247488101534,
+          0.032266458495966696,
+          0.03200204813108039,
+          0.029418126757516764,
+          0.028612012987012988
+        ]
+      },
+      {
+        "id": "r-008",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "dirsheet:7",
+          "macros:3",
+          "dirsheet:1",
+          "dirsheet:6",
+          "dirsheet:12"
+        ],
+        "top_scores": [
+          0.03252247488101534,
+          0.03125763125763126,
+          0.031024531024531024,
+          0.030834914611005692,
+          0.030679156908665108
+        ]
+      },
+      {
+        "id": "r-009",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "colors:6",
+          "colors:2",
+          "colors:7",
+          "menu:4",
+          "colors:8"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.030090497737556562,
+          0.029709507042253523,
+          0.028373015873015873,
+          0.026356857985087564
+        ]
+      },
+      {
+        "id": "r-010",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": false,
+        "top_ids": [
+          "group:9",
+          "columns:18",
+          "group:2",
+          "group:7",
+          "index:3"
+        ],
+        "top_scores": [
+          0.030834914611005692,
+          0.03036576949620428,
+          0.029236022193768675,
+          0.029083245521601686,
+          0.028693528693528692
+        ]
+      },
+      {
+        "id": "g-001",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "columns:18",
+          "columns:15",
+          "columns:5",
+          "split:1",
+          "join:0"
+        ],
+        "top_scores": [
+          0.03225806451612903,
+          0.029877369007803793,
+          0.02919863597612958,
+          0.029030910609857977,
+          0.028083267871170464
+        ]
+      },
+      {
+        "id": "g-002",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "customize:9",
+          "customize:4",
+          "usage:1",
+          "usage:0",
+          "rows:14"
+        ],
+        "top_scores": [
+          0.032266458495966696,
+          0.0304147465437788,
+          0.03021353930031804,
+          0.02886002886002886,
+          0.02667140825035562
+        ]
+      },
+      {
+        "id": "g-003",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "rows:7",
+          "rows:8",
+          "rows:14",
+          "columns:14",
+          "columns:18"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.03200204813108039,
+          0.029211087420042643,
+          0.028790389395194696,
+          0.028665028665028666
+        ]
+      },
+      {
+        "id": "g-004",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "macros:0",
+          "customize:4",
+          "macros:3",
+          "usage:1",
+          "customize:3"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.03125,
+          0.0304147465437788,
+          0.030090497737556562,
+          0.029236022193768675
+        ]
+      },
+      {
+        "id": "g-005",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "usage:1",
+          "customize:4",
+          "navigate:6",
+          "customize:3",
+          "pipes:0"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.031024531024531024,
+          0.030309988518943745,
+          0.030017921146953404,
+          0.028991596638655463
+        ]
+      },
+      {
+        "id": "d-001",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "rows:11",
+          "rows:13",
+          "rows:12",
+          "columns:18",
+          "rows:10"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.03128054740957967,
+          0.03125,
+          0.030621785881252923,
+          0.029571646010002173
+        ]
+      },
+      {
+        "id": "d-002",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "loading:1",
+          "usage:0",
+          "loading:6",
+          "save-restore:2",
+          "dirsheet:2"
+        ],
+        "top_scores": [
+          0.03278688524590164,
+          0.03225806451612903,
+          0.03149801587301587,
+          0.030090497737556562,
+          0.02904040404040404
+        ]
+      },
+      {
+        "id": "d-003",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "group:3",
+          "freq:8",
+          "columns:18",
+          "group:2",
+          "freq:7"
+        ],
+        "top_scores": [
+          0.03252247488101534,
+          0.031024531024531024,
+          0.03057889822595705,
+          0.030309988518943745,
+          0.03009207275993712
+        ]
+      },
+      {
+        "id": "d-004",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "edit:7",
+          "columns:18",
+          "columns:19",
+          "dirsheet:6",
+          "edit:5"
+        ],
+        "top_scores": [
+          0.032018442622950824,
+          0.031754032258064516,
+          0.031544957774465976,
+          0.030798389007344232,
+          0.02928692699490662
+        ]
+      },
+      {
+        "id": "d-005",
+        "mode": "hybrid",
+        "answerable": true,
+        "hit": true,
+        "top_ids": [
+          "save-restore:1",
+          "save-restore:2",
+          "test:0",
+          "columns:18",
+          "columns:19"
+        ],
+        "top_scores": [
+          0.031746031746031744,
+          0.029551337359792925,
+          0.0288981288981289,
+          0.01639344262295082,
+          0.016129032258064516
+        ]
+      },
+      {
+        "id": "t-001",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "columns:21",
+          "colors:3",
+          "formats:12",
+          "colors:4",
+          "formats:9"
+        ],
+        "top_scores": [
+          0.028205128205128206,
+          0.01639344262295082,
+          0.01639344262295082,
+          0.016129032258064516,
+          0.016129032258064516
+        ]
+      },
+      {
+        "id": "t-002",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "usage:1",
+          "save-restore:2",
+          "menu:3",
+          "navigate:3",
+          "customize:4"
+        ],
+        "top_scores": [
+          0.032018442622950824,
+          0.03200204813108039,
+          0.031009615384615385,
+          0.030090497737556562,
+          0.02964254577157803
+        ]
+      },
+      {
+        "id": "t-003",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "formats:15",
+          "usage:1",
+          "formats:12",
+          "move:0",
+          "columns:18"
+        ],
+        "top_scores": [
+          0.01639344262295082,
+          0.01639344262295082,
+          0.016129032258064516,
+          0.016129032258064516,
+          0.015873015873015872
+        ]
+      },
+      {
+        "id": "t-004",
+        "mode": "hybrid",
+        "answerable": false,
+        "hit": null,
+        "top_ids": [
+          "edit:1",
+          "columns:20",
+          "plugins:2",
+          "customize:3",
+          "split:1"
+        ],
+        "top_scores": [
+          0.031754032258064516,
+          0.02886002886002886,
+          0.02813852813852814,
+          0.027205882352941177,
+          0.026334026334026334
+        ]
+      }
+    ]
+  },
+  "answers": {
+    "meaning": [
+      {
+        "id": "r-001",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 13.609089851379395,
+        "seconds": 3.5261478750035167
+      },
+      {
+        "id": "r-002",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.918181419372559,
+        "seconds": 1.7962430003099144
+      },
+      {
+        "id": "r-003",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 17.063636779785156,
+        "seconds": 1.3953871671110392
+      },
+      {
+        "id": "r-004",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 17.381816864013672,
+        "seconds": 3.6442476669326425
+      },
+      {
+        "id": "r-005",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.618182182312012,
+        "seconds": 2.9470670837908983
+      },
+      {
+        "id": "r-006",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 12.781816482543945,
+        "seconds": 1.888224707916379
+      },
+      {
+        "id": "r-007",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "abstained",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 15.663636207580566,
+        "seconds": 0.5448073749430478
+      },
+      {
+        "id": "r-008",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 7.799999237060547,
+        "seconds": 0.7856654170900583
+      },
+      {
+        "id": "r-009",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 13.027273178100586,
+        "seconds": 1.7860704171471298
+      },
+      {
+        "id": "r-010",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 22.118181228637695,
+        "seconds": 5.2335847918875515
+      },
+      {
+        "id": "g-001",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 15.609089851379395,
+        "seconds": 0.5060810004360974
+      },
+      {
+        "id": "g-002",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 7.018180847167969,
+        "seconds": 0.5025437497533858
+      },
+      {
+        "id": "g-003",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 7.772727012634277,
+        "seconds": 0.5285681248642504
+      },
+      {
+        "id": "g-004",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 9.936363220214844,
+        "seconds": 0.5296036656945944
+      },
+      {
+        "id": "g-005",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 7.054544925689697,
+        "seconds": 0.5496338750235736
+      },
+      {
+        "id": "d-001",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 7.03636360168457,
+        "seconds": 1.4087807079777122
+      },
+      {
+        "id": "d-002",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 13.109089851379395,
+        "seconds": 0.9845771659165621
+      },
+      {
+        "id": "d-003",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 9.581817626953125,
+        "seconds": 0.9776851660571992
+      },
+      {
+        "id": "d-004",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.781818389892578,
+        "seconds": 4.2226102920249104
+      },
+      {
+        "id": "d-005",
+        "mode": "meaning",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 20.18181800842285,
+        "seconds": 3.192425500135869
+      },
+      {
+        "id": "t-001",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.518180847167969,
+        "seconds": 0.522228832822293
+      },
+      {
+        "id": "t-002",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 8.654544830322266,
+        "seconds": 0.3855520002543926
+      },
+      {
+        "id": "t-003",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 13.509090423583984,
+        "seconds": 0.5137931667268276
+      },
+      {
+        "id": "t-004",
+        "mode": "meaning",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 13.609090805053711,
+        "seconds": 0.5213993326760828
+      }
+    ],
+    "hybrid": [
+      {
+        "id": "r-001",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "abstained",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 13.099998474121094,
+        "seconds": 0.6448239577002823
+      },
+      {
+        "id": "r-002",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.42727279663086,
+        "seconds": 2.3119495417922735
+      },
+      {
+        "id": "r-003",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 18.81818199157715,
+        "seconds": 5.158190040849149
+      },
+      {
+        "id": "r-004",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 17.063636779785156,
+        "seconds": 3.205997166223824
+      },
+      {
+        "id": "r-005",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 15.018180847167969,
+        "seconds": 1.7949377093464136
+      },
+      {
+        "id": "r-006",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 12.209090232849121,
+        "seconds": 1.4673887500539422
+      },
+      {
+        "id": "r-007",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "abstained",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 15.627272605895996,
+        "seconds": 0.4091439158655703
+      },
+      {
+        "id": "r-008",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 6.09999942779541,
+        "seconds": 0.687335042282939
+      },
+      {
+        "id": "r-009",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 10.53636360168457,
+        "seconds": 1.580738958902657
+      },
+      {
+        "id": "r-010",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "abstained",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 16.754545211791992,
+        "seconds": 0.5708815832622349
+      },
+      {
+        "id": "g-001",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.036362648010254,
+        "seconds": 0.4441509167663753
+      },
+      {
+        "id": "g-002",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 10.03636360168457,
+        "seconds": 0.4138424168340862
+      },
+      {
+        "id": "g-003",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 11.145453453063965,
+        "seconds": 0.41829104209318757
+      },
+      {
+        "id": "g-004",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 7.6999993324279785,
+        "seconds": 0.4091683328151703
+      },
+      {
+        "id": "g-005",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 8.763635635375977,
+        "seconds": 0.5243617906235158
+      },
+      {
+        "id": "d-001",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 9.272727012634277,
+        "seconds": 0.9076277911663055
+      },
+      {
+        "id": "d-002",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 12.445453643798828,
+        "seconds": 2.426136333029717
+      },
+      {
+        "id": "d-003",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 9.93636417388916,
+        "seconds": 1.09349941695109
+      },
+      {
+        "id": "d-004",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 16.036361694335938,
+        "seconds": 2.041153291705996
+      },
+      {
+        "id": "d-005",
+        "mode": "hybrid",
+        "answerable": true,
+        "status": "answered",
+        "abstained_correctly": null,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 18.854543685913086,
+        "seconds": 3.8564576669596136
+      },
+      {
+        "id": "t-001",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 14.509090423583984,
+        "seconds": 0.46024466725066304
+      },
+      {
+        "id": "t-002",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 8.654544830322266,
+        "seconds": 0.5166046251542866
+      },
+      {
+        "id": "t-003",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 12.972726821899414,
+        "seconds": 0.3107587080448866
+      },
+      {
+        "id": "t-004",
+        "mode": "hybrid",
+        "answerable": false,
+        "status": "abstained",
+        "abstained_correctly": true,
+        "invalid_citations": 0,
+        "llm_calls": 1,
+        "neurons": 9.272727012634277,
+        "seconds": 0.4509769161231816
+      }
+    ]
+  }
+}
