@@ -52,3 +52,14 @@ def test_vector_index_setting_defaults_to_none_and_rejects_unknown_kinds(tmp_pat
     path.write_text(text, encoding="utf-8")
     with pytest.raises(ValidationError):
         load_config(path)
+
+
+def test_api_and_retention_settings_live_in_config():
+    cfg = load_config(CONFIG)
+    assert cfg.api.cors_origins, "the allowlist must not be empty"
+    assert cfg.limits.global_daily_neurons == 8000
+    assert cfg.limits.retention_days == 30
+
+
+def test_production_cors_list_has_only_https_origins():
+    assert all(o.startswith("https://") for o in load_config(CONFIG).api.cors_origins)

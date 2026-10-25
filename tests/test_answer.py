@@ -260,3 +260,33 @@ def test_a_reply_that_is_only_a_citation_is_abstained():
 def test_a_refusal_for_no_valid_citation_still_shows_the_closest_pages():
     a, _, _ = run("PWNED")
     assert a.status == "abstained" and len(a.closest) == 2
+
+
+class Exploding:
+    name = "exploding"
+
+    def complete(self, system, user, max_tokens):
+        raise AssertionError("the model must not be called below the evidence threshold")
+
+
+def test_below_threshold_abstains_with_no_model_call():
+    hits = [Hit("join:0", 0.02), Hit("rows:0", 0.01)]
+    a = answer_question("what does & do?", hits, PIECES, Adapter([Exploding()]), CFG, "VisiData",
+                        threshold=0.03)
+    assert a.status == "abstained" and a.text == NOT_FOUND_TEXT
+    assert a.llm_calls == 0 and a.top_score == 0.02
+    assert [c.url for c in a.closest] == [PIECES["join:0"].url, PIECES["rows:0"].url]
+
+
+def test_at_threshold_goes_to_the_model():
+    a, _, adapter = run("It joins sheets [1].", hits=[Hit("join:0", 0.03)])
+    assert a.status == "answered"  # no threshold passed: unchanged behaviour
+    fake = Fake("It joins sheets [1].")
+    b = answer_question("what does & do?", [Hit("join:0", 0.03)], PIECES, Adapter([fake]), CFG,
+                        "VisiData", threshold=0.03)
+    assert b.status == "answered" and b.llm_calls == 1
+
+
+def test_no_threshold_keeps_the_old_behaviour_even_for_tiny_scores():
+    a, _, _ = run("It joins sheets [1].", hits=[Hit("join:0", 0.0001)])
+    assert a.status == "answered"

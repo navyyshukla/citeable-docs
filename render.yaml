@@ -1,0 +1,25 @@
+# Render blueprint for the API. The secrets are declared here but their values are set in the
+# Render dashboard (sync: false); they never live in this file.
+services:
+  - type: web
+    name: citeable-docs-api
+    runtime: python
+    plan: free
+    region: ohio            # next to Neon (us-east-2)
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install .
+    # --no-access-log: the access log would record client IPs, which we promise not to keep.
+    startCommand: uvicorn --factory app.api:build_from_env --host 0.0.0.0 --port $PORT --no-access-log
+    healthCheckPath: /health   # does not touch the database, so the check never wakes Neon
+    envVars:
+      - key: PYTHON_VERSION    # match CI (3.12); Render's default is newer than what we test on
+        value: 3.12.11
+      - key: DATABASE_URL
+        sync: false
+      - key: CF_ACCOUNT_ID
+        sync: false
+      - key: CF_API_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

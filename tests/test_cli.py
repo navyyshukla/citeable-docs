@@ -19,6 +19,14 @@ class FakeStore:
     """Stands in for Store; records whether the replace was attempted."""
     def __init__(self, stored: int, pages: tuple = ("p",)):
         self.stored, self.pages, self.replaced = stored, pages, False
+        self.model_ok, self.meta = True, None
+
+    def check_ingest_meta(self, project, model):
+        if not self.model_ok:
+            raise ValueError("pieces were embedded with 'old' but the config says 'new'")
+
+    def write_ingest_meta(self, project, model, dim, docs_ref):
+        self.meta = (project, model, dim, docs_ref)
 
     def init_schema(self):
         pass
@@ -63,6 +71,33 @@ def test_ingest_replaces_when_count_is_plausible(monkeypatch):
     _wire(monkeypatch, store)
     monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
     assert main(["ingest"]) == 0
+    assert store.replaced
+
+
+def test_ingest_writes_meta_after_replace(monkeypatch):
+    store = FakeStore(stored=120)
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest"]) == 0
+    assert store.meta[0] == "visidata" and store.meta[3] == f"stable@{SHA[:10]}"
+
+
+def test_ingest_refuses_changed_embedding_model(monkeypatch, capsys):
+    store = FakeStore(stored=120)
+    store.model_ok = False
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest"]) == 1
+    assert not store.replaced
+    assert "embedded with" in capsys.readouterr().err
+
+
+def test_allow_model_change_skips_the_check(monkeypatch):
+    store = FakeStore(stored=120)
+    store.model_ok = False
+    _wire(monkeypatch, store)
+    monkeypatch.setattr("app.cli.build_pieces", lambda files, cfg, docs_ref=None: FAKE_PIECES)
+    assert main(["ingest", "--allow-model-change"]) == 0
     assert store.replaced
 
 
@@ -119,3 +154,183 @@ def test_pieces_are_stored_with_the_docs_commit_in_docs_ref(monkeypatch):
     monkeypatch.setattr("app.cli.build_pieces", build)
     assert main(["ingest"]) == 0
     assert seen["ref"] == "stable@abcdef0123"
+
+
+def test_calibrate_prints_a_table_without_touching_network_or_database(tmp_path, capsys):
+    import json
+    rows = [{"id": "a", "mode": "hybrid", "answerable": True, "hit": True, "top_ids": ["x"],
+             "top_scores": [0.033], "error": None},
+            {"id": "b", "mode": "hybrid", "answerable": False, "hit": None, "top_ids": ["x"],
+             "top_scores": [0.012], "error": None}]
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps({"meta": {}, "retrieval": {"hybrid": rows}}))
+    assert main(["calibrate", "--retrieval", str(f), "--mode", "hybrid"]) == 0
+    out = capsys.readouterr().out
+    assert "threshold" in out and "answered%" in out and "0.0330" in out
+
+
+def test_calibrate_unknown_mode_fails_cleanly(tmp_path, capsys):
+    import json
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps({"meta": {}, "retrieval": {"hybrid": []}}))
+    assert main(["calibrate", "--retrieval", str(f), "--mode", "nope"]) == 1
+    assert "nope" in capsys.readouterr().err
+
+
+class FakeUsage:
+    def __init__(self):
+        self.created, self.revoked, self.purged, self.schema = [], [], [], False
+        self.active = {"ann"}
+
+    def init_schema(self):
+        self.schema = True
+
+    def create_token(self, label):
+        if label in self.active:
+            raise ValueError(f"a token labelled {label!r} already exists")
+        self.created.append(label)
+        return "PLAIN-TOKEN-123"
+
+    def revoke_token(self, label):
+        self.revoked.append(label)
+        return label in self.active
+
+    def list_tokens(self):
+        from datetime import datetime, timezone
+
+        from app.usage import TokenInfo
+        t = datetime(2026, 10, 20, tzinfo=timezone.utc)
+        return [TokenInfo("ann", t, False, 3), TokenInfo("bob", t, True, 0)]
+
+    def purge(self, older_than_days):
+        self.purged.append(older_than_days)
+        return 7
+
+
+def _admin(monkeypatch):
+    usage, store = FakeUsage(), FakeStore(stored=0)
+    store.inited = False
+    store.init_schema = lambda: setattr(store, "inited", True)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setattr("app.cli.Usage", lambda db: usage)
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+    return usage, store
+
+
+def test_init_db_creates_every_table(monkeypatch):
+    usage, store = _admin(monkeypatch)
+    assert main(["init-db"]) == 0
+    assert usage.schema and store.inited
+
+
+def test_token_create_prints_plain_token_once(monkeypatch, capsys):
+    usage, _ = _admin(monkeypatch)
+    assert main(["token", "create", "carol"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("PLAIN-TOKEN-123") == 1 and "carol" in out and "not be shown again" in out
+    assert usage.created == ["carol"]
+
+
+def test_token_create_duplicate_label_fails_cleanly(monkeypatch, capsys):
+    _admin(monkeypatch)
+    assert main(["token", "create", "ann"]) == 1
+    assert "already exists" in capsys.readouterr().err
+
+
+def test_token_revoke(monkeypatch, capsys):
+    usage, _ = _admin(monkeypatch)
+    assert main(["token", "revoke", "ann"]) == 0
+    assert main(["token", "revoke", "zed"]) == 1
+    assert "zed" in capsys.readouterr().err
+
+
+def test_token_list_shows_labels_and_never_hashes(monkeypatch, capsys):
+    _admin(monkeypatch)
+    assert main(["token", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "ann" in out and "bob" in out and "revoked" in out
+    assert "hash" not in out.lower() and "PLAIN" not in out
+
+
+def test_purge_defaults_to_the_configured_retention(monkeypatch, capsys):
+    usage, _ = _admin(monkeypatch)
+    assert main(["purge"]) == 0
+    assert main(["purge", "--days", "7"]) == 0
+    assert usage.purged == [30, 7]
+    assert "7" in capsys.readouterr().out
+
+
+def test_serve_runs_the_factory_without_an_access_log(monkeypatch):
+    calls = {}
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.update(app=app, **kw))
+    assert main(["serve", "--port", "9000"]) == 0
+    assert calls["app"] == "app.api:build_from_env" and calls["factory"] is True
+    assert calls["access_log"] is False and calls["port"] == 9000
+
+
+def _judge_files(tmp_path, answers_row=None):
+    import json
+    q = tmp_path / "q.jsonl"
+    q.write_text(json.dumps({"id": "a", "question": "a public paraphrase", "answerable": True,
+                             "gold_page": "join", "source": "synthetic", "split": "dev",
+                             "reference_answer": "ref"}) + "\n")
+    row = answers_row or {"id": "a", "status": "answered", "text": "It joins [1].",
+                          "cited_ids": ["join:0"], "question": "a public paraphrase"}
+    res = tmp_path / "res.json"
+    res.write_text(json.dumps({"meta": {"split": "dev"}, "answers": {"hybrid": [row]}}))
+    return q, res
+
+
+def test_judge_writes_verdicts_and_says_uncalibrated(monkeypatch, tmp_path, capsys):
+    import json
+
+    from app.llm.base import Completion
+    q, res = _judge_files(tmp_path)
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: [SimpleNamespace(id="join:0", text="Type & to join.")]
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+
+    class G:
+        def __init__(self, key, json_output=False):
+            assert json_output is True
+
+        def complete(self, s, u, n):
+            assert "Type & to join." in u
+            return Completion('{"grounded": true, "correct": true, "reason": "ok"}', "gemini",
+                              "m", 1, 1, None, 0.1)
+
+    monkeypatch.setattr("app.cli.GeminiProvider", G)
+    out = tmp_path / "v.json"
+    assert main(["judge", "--results", str(res), "--data", str(q), "--mode", "hybrid",
+                 "--out", str(out)]) == 0
+    verdicts = json.loads(out.read_text())
+    assert verdicts[0]["question_id"] == "a" and verdicts[0]["correct"] is True
+    assert "uncalibrated" in capsys.readouterr().out.lower()
+
+
+def test_judge_refuses_results_with_questions_outside_the_curated_file(monkeypatch, tmp_path,
+                                                                       capsys):
+    q, res = _judge_files(tmp_path, {"id": "zzz", "status": "answered", "text": "t",
+                                     "cited_ids": [], "question": "typed by a visitor"})
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: []
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+    assert main(["judge", "--results", str(res), "--data", str(q), "--out",
+                 str(tmp_path / "v.json")]) == 1
+    assert "zzz" in capsys.readouterr().err
+
+
+def test_judge_agreement_prints_precision_and_recall(tmp_path, capsys):
+    import json
+    v = tmp_path / "v.json"
+    v.write_text(json.dumps([{"question_id": "1", "grounded": True, "correct": True,
+                              "reason": "", "error": None}]))
+    lab = tmp_path / "l.jsonl"
+    lab.write_text(json.dumps({"question_id": "1", "correct": True}) + "\n")
+    assert main(["judge-agreement", "--verdicts", str(v), "--labels", str(lab)]) == 0
+    out = capsys.readouterr().out
+    assert "precision" in out and "recall" in out and "1.00" in out

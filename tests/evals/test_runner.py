@@ -200,3 +200,26 @@ def test_also_gold_pages_count_as_hits_and_the_heading_rule_is_for_the_main_page
     assert is_hit(mk("internal_formats:4", "t", ("Formats", ".vds")), qq)
     assert not is_hit(mk("internal_formats:0", "t", ("Formats", "intro")), qq)
     assert not is_hit(mk("rows:0", "t", ("Rows",)), qq)
+
+
+def test_answer_row_keeps_question_text_and_score_for_the_judge():
+    rows, _ = run_answers([q("1", "what does & do?", page="join")], SEARCH, BY_ID,
+                          Adapter([Fake("It joins [1].")]), CFG, "VisiData", "keyword", 3,
+                          max_neurons=1000)
+    assert rows[0].question == "what does & do?"
+    assert rows[0].text and "joins" in rows[0].text
+    assert rows[0].top_score is not None and rows[0].top_score > 0
+
+
+def test_hybrid_eval_uses_the_configured_threshold_other_modes_do_not():
+    cfg = CFG.model_copy(update={"search": CFG.search.model_copy(
+        update={"evidence_threshold": 1e9})})
+    qs = [q("1", "what does & do?", page="join")]
+    h, _ = run_answers(qs, SEARCH, BY_ID, Adapter([Fake()]), cfg, "VisiData", "keyword", 3,
+                       max_neurons=1000)
+    assert h[0].status == "answered"  # keyword scores are on another scale: no threshold
+    hybrid = Searcher(PIECES, embed_query=lambda t: [0.0],
+                      vector_search=lambda v, k: [("join:0", 0.9)])
+    rows, _ = run_answers(qs, hybrid, BY_ID, Adapter([Fake()]), cfg, "VisiData", "hybrid", 3,
+                          max_neurons=1000)
+    assert rows[0].status == "abstained" and rows[0].llm_calls == 0

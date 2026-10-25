@@ -110,12 +110,18 @@ def _citation(n: int, p: Piece) -> Citation:
     return Citation(n, " › ".join(p.heading_path), p.citation_url, p.docs_version, p.last_updated)
 
 
+# NUL and lone surrogates are valid JSON but cannot be stored in Postgres text (or UTF-8).
+BAD_CHARS = re.compile("[\x00\ud800-\udfff]")
+
+
 def validate_question(question: str, cfg: Config) -> str:
     q = question.strip()
     if not q:
         raise ValueError("question is empty")
     if len(q) > cfg.limits.max_question_chars:
         raise ValueError(f"question longer than {cfg.limits.max_question_chars} characters")
+    if BAD_CHARS.search(q):
+        raise ValueError("question contains characters that are not allowed")
     return q
 
 
@@ -158,11 +164,18 @@ def _answer_from(question: str, excerpts: list[Piece], adapter: Adapter, cfg: Co
 
 
 def answer_question(question: str, hits: list[Hit], pieces_by_id: dict[str, Piece],
-                    adapter: Adapter, cfg: Config, project_name: str) -> Answer:
+                    adapter: Adapter, cfg: Config, project_name: str,
+                    threshold: float | None = None) -> Answer:
+    """`threshold` is the evidence rule: a best hit scoring below it is "not found" with no
+    model call. Scores are only comparable within one search mode (the hybrid fusion score)."""
     q = validate_question(question, cfg)
     kept = [(h, pieces_by_id[h.piece_id]) for h in hits if h.piece_id in pieces_by_id]
     if not kept:
         return Answer("abstained", NOT_FOUND_TEXT, llm_calls=0)
+    if threshold is not None and kept[0][0].score < threshold:
+        return Answer("abstained", NOT_FOUND_TEXT,
+                      closest=[_citation(n, p) for n, (_, p) in enumerate(kept[:3], start=1)],
+                      llm_calls=0, top_score=kept[0][0].score)
     return _answer_from(q, [p for _, p in kept], adapter, cfg, project_name, kept[0][0].score)
 
 

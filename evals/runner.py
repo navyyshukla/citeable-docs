@@ -49,6 +49,10 @@ class AnswerRow:
     cited_ids: list[str] = field(default_factory=list)  # pieces the answer cites
     cited_gold: bool | None = None  # answerable and answered: does a cited piece match the gold?
     error: str | None = None  # status "error": the question failed, the run went on
+    # Kept for the AI judge and the threshold table. Eval questions are public paraphrases.
+    question: str = ""
+    text: str | None = None
+    top_score: float | None = None
 
 
 def run_retrieval(questions: list[EvalQuestion], searcher: Searcher,
@@ -71,7 +75,8 @@ def run_retrieval(questions: list[EvalQuestion], searcher: Searcher,
 
 
 def _error_row(q: EvalQuestion, mode: str, e: Exception) -> AnswerRow:
-    return AnswerRow(q.id, mode, q.answerable, "error", None, 0, 0, None, None, error=str(e))
+    return AnswerRow(q.id, mode, q.answerable, "error", None, 0, 0, None, None, error=str(e),
+                     question=q.question)
 
 
 def run_answers(questions: list[EvalQuestion], searcher: Searcher, pieces_by_id: dict[str, Piece],
@@ -92,7 +97,11 @@ def run_answers(questions: list[EvalQuestion], searcher: Searcher, pieces_by_id:
             continue
         try:
             hits = searcher.search(mode, q.question, k)
-            a = answer_question(q.question, hits, pieces_by_id, adapter, cfg, project_name)
+            # The evidence rule applies only to hybrid: it is the mode users get, and the
+            # threshold is calibrated on its fusion scores.
+            threshold = cfg.search.evidence_threshold if mode == "hybrid" else None
+            a = answer_question(q.question, hits, pieces_by_id, adapter, cfg, project_name,
+                                threshold)
         except (AllProvidersFailed, ProviderError) as e:
             worst = max(worst, adapter.total_neurons - spent_before)
             rows.append(_error_row(q, mode, e))
@@ -105,7 +114,8 @@ def run_answers(questions: list[EvalQuestion], searcher: Searcher, pieces_by_id:
                       if a.status == "answered" and q.answerable else None)
         rows.append(AnswerRow(q.id, mode, q.answerable, a.status, abstained_ok,
                               len(a.invalid_citations), a.llm_calls, a.neurons, a.seconds,
-                              [p.id for p in cited], cited_gold))
+                              [p.id for p in cited], cited_gold, question=q.question,
+                              text=a.text, top_score=a.top_score))
     return rows, False
 
 

@@ -42,6 +42,9 @@ class LimitsCfg(_Strict):
     max_completion_tokens_no_thinking: int = 1000
     global_daily_cap: int = 150
     per_visitor_daily_cap: int = 10
+    # Cloudflare's free allowance is 10,000 neurons/day; leave room for evals and the fallback.
+    global_daily_neurons: float = 8000
+    retention_days: int = 30
 
 
 class ModelsCfg(_Strict):
@@ -56,11 +59,17 @@ class ModelsCfg(_Strict):
     non_reasoning: list[str] = Field(default_factory=list)
 
 
+class ApiCfg(_Strict):
+    # Browser origins allowed to call the API (CORS). Not a secret: it is the public site.
+    cors_origins: list[str]
+
+
 class Config(_Strict):
     project: ProjectCfg
     search: SearchCfg = SearchCfg()
     limits: LimitsCfg = LimitsCfg()
     models: ModelsCfg
+    api: ApiCfg
 
 
 def load_config(path: Path | str) -> Config:

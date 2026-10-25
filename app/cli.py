@@ -1,5 +1,7 @@
 """Commands: ingest docs into the database; run evals."""
 import argparse
+import json
+from dataclasses import asdict
 import os
 import sys
 from collections import Counter
@@ -8,13 +10,19 @@ from pathlib import Path
 import httpx
 
 from app.config import load_config
+from app.db import Db
 from app.llm.build import build_adapter
 from app.llm.cloudflare import CloudflareClient, embed_texts
+from app.llm.gemini import GeminiProvider
 from app.search import Searcher
 from app.store import Store
-from evals.runner import (run_answers, run_retrieval, summarize_answers, summarize_retrieval,
+from app.usage import Usage
+from evals.runner import (RetrievalRow, run_answers, run_retrieval, summarize_answers, summarize_retrieval,
                           write_results)
+from evals.judge import (JudgeVerdict, agreement, items_from_results, judge_answer,
+                         load_labels)
 from evals.schema import load_questions
+from evals.threshold import threshold_table
 from ingest.fetch import fetch_docs_and_commit
 from ingest.pipeline import build_pieces
 
@@ -22,7 +30,7 @@ MIN_PIECES = 100  # the real docs give about 230; fewer means a broken download 
 
 
 def _store(cfg) -> Store:
-    return Store(os.environ["DATABASE_URL"], cfg.models.embedding_dim,
+    return Store(Db(os.environ["DATABASE_URL"]), cfg.models.embedding_dim,
                  vector_index=cfg.search.vector_index)
 
 
@@ -41,6 +49,12 @@ def cmd_ingest(args) -> int:
         return 0
     store = _store(cfg)
     store.init_schema()
+    if not args.allow_model_change:
+        try:
+            store.check_ingest_meta(cfg.project.slug, cfg.models.embedding)
+        except ValueError as e:
+            print(f"refusing to replace: {e}", file=sys.stderr)
+            return 1
     # An empty or tiny parse must never delete the stored pieces (cold review of Tasks 6-9),
     # and neither may a parse that lost whole pages (cold review #2).
     stored = store.load_pieces(cfg.project.slug)
@@ -59,6 +73,8 @@ def cmd_ingest(args) -> int:
     vectors = embed_texts(cf, cfg.models.embedding, [p.search_text for p in pieces],
                           cfg.models.embedding_batch)
     store.replace_project_pieces(cfg.project.slug, pieces, vectors)
+    store.write_ingest_meta(cfg.project.slug, cfg.models.embedding, cfg.models.embedding_dim,
+                            docs_ref)
     print(f"stored {len(pieces)} pieces for project {cfg.project.slug}")
     return 0
 
@@ -109,6 +125,121 @@ def cmd_eval(args) -> int:
     return 0
 
 
+def _db() -> Db:
+    return Db(os.environ["DATABASE_URL"])
+
+
+def cmd_init_db(args) -> int:
+    cfg = load_config(args.config)
+    db = Db(os.environ["DATABASE_URL"])
+    Store(db, cfg.models.embedding_dim, vector_index=cfg.search.vector_index).init_schema()
+    Usage(db).init_schema()
+    print("tables ready: pieces, ingest_meta, invite_tokens, questions, feedback")
+    return 0
+
+
+def cmd_token(args) -> int:
+    usage = Usage(_db())
+    if args.action == "create":
+        try:
+            token = usage.create_token(args.label)
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return 1
+        print(f"token for {args.label}: {token}")
+        print("Copy it now: it is stored only as a hash and will not be shown again.")
+        return 0
+    if args.action == "revoke":
+        if not usage.revoke_token(args.label):
+            print(f"no active token labelled {args.label!r}", file=sys.stderr)
+            return 1
+        print(f"revoked {args.label}")
+        return 0
+    print(f"{'label':<20} {'created':<12} {'state':<8} questions today")
+    for t in usage.list_tokens():
+        state = "revoked" if t.revoked else "active"
+        print(f"{t.label:<20} {t.created_at:%Y-%m-%d}   {state:<8} {t.questions_today}")
+    return 0
+
+
+def cmd_purge(args) -> int:
+    cfg = load_config(args.config)
+    days = args.days if args.days is not None else cfg.limits.retention_days
+    n = Usage(_db()).purge(days)
+    print(f"deleted {n} questions older than {days} days (feedback goes with them)")
+    return 0
+
+
+def cmd_serve(args) -> int:
+    import uvicorn  # imported here: only the server needs it
+
+    # access_log off: the access log would record client IPs, and we promise not to keep them.
+    uvicorn.run("app.api:build_from_env", factory=True, host=args.host, port=args.port,
+                access_log=False)
+    return 0
+
+
+def cmd_judge(args) -> int:
+    """Score saved eval answers with Gemini. Reads the public docs pieces (read-only) and the
+    curated question file; it never opens the user question log."""
+    cfg = load_config(args.config)
+    results = json.loads(Path(args.results).read_text(encoding="utf-8"))
+    if args.mode not in results.get("answers", {}):
+        print(f"mode {args.mode!r} has no answers in {args.results}", file=sys.stderr)
+        return 1
+    piece_text = {p.id: p.text for p in _store(cfg).load_pieces(cfg.project.slug)}
+    try:
+        items, skipped = items_from_results(results, load_questions(Path(args.data)), args.mode,
+                                            piece_text)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    provider = GeminiProvider(os.environ["GEMINI_API_KEY"], json_output=True)
+    verdicts = [judge_answer(i, provider) for i in items]
+    Path(args.out).write_text(json.dumps([asdict(v) for v in verdicts], indent=2),
+                              encoding="utf-8")
+    errors = sum(1 for v in verdicts if v.error)
+    print(f"judged {len(verdicts)} answers ({errors} judge errors, {skipped} rows skipped: "
+          "not answered or no saved text). UNCALIBRATED until judge-agreement has been run "
+          "against hand-graded labels.")
+    return 0
+
+
+def cmd_judge_agreement(args) -> int:
+    verdicts = [JudgeVerdict(**v)
+                for v in json.loads(Path(args.verdicts).read_text(encoding="utf-8"))]
+    a = agreement(verdicts, load_labels(Path(args.labels)))
+
+    def fmt(x):
+        return "n/a" if x is None else f"{x:.2f}"
+    print(f"compared {a['compared']} labelled answers "
+          f"({a['skipped_errors']} judge errors, {a['missing_verdicts']} without a verdict)")
+    print(f"precision {fmt(a['precision'])}  recall {fmt(a['recall'])}  "
+          f"(TP {a['true_positive']} FP {a['false_positive']} FN {a['false_negative']} "
+          f"TN {a['true_negative']})")
+    return 0
+
+
+def cmd_calibrate(args) -> int:
+    """Print what each evidence threshold would do. Reads a saved file: no network, no neurons."""
+    data = json.loads(Path(args.retrieval).read_text(encoding="utf-8"))
+    if args.mode not in data["retrieval"]:
+        print(f"mode {args.mode!r} not in {args.retrieval} (has {sorted(data['retrieval'])})",
+              file=sys.stderr)
+        return 1
+    rows = [RetrievalRow(**r) for r in data["retrieval"][args.mode]]
+    # Candidate thresholds: each distinct best score seen, plus 0 (answer everything).
+    best = sorted({max(r.top_scores) for r in rows if r.top_scores})
+    table = threshold_table(rows, [0.0] + best)
+    print(f"{'threshold':>10} {'answered%':>10} {'wrong%':>8} {'abstain_ok%':>12}")
+    for t in table:
+        def fmt(x):
+            return "-" if x is None else f"{x:.0f}"
+        print(f"{t.threshold:>10.4f} {t.answered_pct:>10.0f} {fmt(t.wrong_when_answered_pct):>8} "
+              f"{fmt(t.correctly_abstained_pct):>12}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="app.cli")
     p.add_argument("--config", default="config/visidata.yaml")
@@ -116,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
     i = sub.add_parser("ingest")
     i.add_argument("--dry-run", action="store_true")
     i.add_argument("--allow-shrink", action="store_true")
+    i.add_argument("--allow-model-change", action="store_true")
     i.add_argument("--config", default=argparse.SUPPRESS)
     e = sub.add_parser("eval")
     e.add_argument("--split", default="dev")
@@ -125,8 +257,38 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--max-neurons", type=float, default=1500.0)
     e.add_argument("--out", required=True)
     e.add_argument("--config", default=argparse.SUPPRESS)
+    c = sub.add_parser("calibrate")
+    c.add_argument("--retrieval", required=True)
+    c.add_argument("--mode", default="hybrid")
+    c.add_argument("--config", default=argparse.SUPPRESS)
+    sub.add_parser("init-db").add_argument("--config", default=argparse.SUPPRESS)
+    t = sub.add_parser("token")
+    t.add_argument("action", choices=["create", "revoke", "list"])
+    t.add_argument("label", nargs="?")
+    t.add_argument("--config", default=argparse.SUPPRESS)
+    u = sub.add_parser("purge")
+    u.add_argument("--days", type=int, default=None)
+    u.add_argument("--config", default=argparse.SUPPRESS)
+    v = sub.add_parser("serve")
+    v.add_argument("--host", default="127.0.0.1")
+    v.add_argument("--port", type=int, default=8000)
+    v.add_argument("--config", default=argparse.SUPPRESS)
+    j = sub.add_parser("judge")
+    j.add_argument("--results", required=True)
+    j.add_argument("--data", default="evals/data/dev.jsonl")
+    j.add_argument("--mode", default="hybrid")
+    j.add_argument("--out", required=True)
+    j.add_argument("--config", default=argparse.SUPPRESS)
+    g = sub.add_parser("judge-agreement")
+    g.add_argument("--verdicts", required=True)
+    g.add_argument("--labels", required=True)
     args = p.parse_args(argv)
-    return cmd_ingest(args) if args.cmd == "ingest" else cmd_eval(args)
+    if args.cmd == "token" and args.action != "list" and not args.label:
+        p.error(f"token {args.action} needs a LABEL")
+    return {"ingest": cmd_ingest, "eval": cmd_eval, "calibrate": cmd_calibrate,
+            "init-db": cmd_init_db, "token": cmd_token, "purge": cmd_purge,
+            "serve": cmd_serve, "judge": cmd_judge,
+            "judge-agreement": cmd_judge_agreement}[args.cmd](args)
 
 
 if __name__ == "__main__":

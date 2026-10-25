@@ -13,7 +13,7 @@ project:
 search:
   top_k: 5
   rrf_k: 60
-  evidence_threshold: 0.0
+  evidence_threshold: 0.02
   vector_index: none
 limits:
   max_question_chars: 500
@@ -22,6 +22,8 @@ limits:
   max_completion_tokens_no_thinking: 1000
   global_daily_cap: 150
   per_visitor_daily_cap: 10
+  global_daily_neurons: 8000
+  retention_days: 30
 models:
   embedding: "@cf/baai/bge-base-en-v1.5"
   embedding_dim: 768
@@ -39,3 +41,6 @@ models:
     "@cf/google/gemma-4-26b-a4b-it": false
   non_reasoning:
     - "@cf/meta/llama-3.1-8b-instruct-fp8"
+api:
+  cors_origins:
+    - https://navyyshukla.github.io
