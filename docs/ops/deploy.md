@@ -22,13 +22,17 @@ The service is defined in `render.yaml`. Secrets are set in the Render dashboard
 3. `python -m app.cli token create owner-test` and copy the token once.
 4. `SMOKE_TOKEN=<token> python scripts/smoke.py https://<service>.onrender.com`; paste the timings below. (The token is read from the environment so it stays out of shell history. The two smoke questions are written to the question log and count against that token's cap.)
 
-## Measured on first deploy (fill in)
+## Measured on first deploy (2026-10-25, laptop to Render Ohio, smoke 5/5 pass)
+
+Build log: Python 3.12.11 via `PYTHON_VERSION`. The service was already warm (a `/health` call minutes
+earlier), so the cold-start row is still to be measured after 15+ minutes idle.
 
 | Step | Seconds |
 |---|---|
-| health after idle (cold start) | |
-| first /ask (loads the index) | |
-| later /ask (warm) | |
+| health after idle (cold start) | not measured yet (Render says 50 s or more) |
+| health (warm) | 0.3 |
+| first /ask (loads the index) | 2.8 |
+| out-of-docs /ask (abstains, no model call) | 0.6 |
 
 ## Day to day
 
