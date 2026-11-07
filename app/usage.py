@@ -97,6 +97,8 @@ class Usage:
                     seconds DOUBLE PRECISION,
                     docs_ref TEXT,
                     error TEXT)""")
+            # Added in Plan 3a: an existing table (production) gets the column on the next run.
+            c.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS retrieved_ids JSONB")
             c.execute("CREATE INDEX IF NOT EXISTS questions_created_at ON questions (created_at)")
             c.execute("""
                 CREATE TABLE IF NOT EXISTS feedback (
@@ -171,14 +173,17 @@ class Usage:
     def finish(self, request_id: str, *, status: Literal["answered", "abstained", "error"],
                answer_text: str | None, citations: list[dict], top_score: float | None,
                provider: str | None, model: str | None, neurons: float | None, llm_calls: int,
-               seconds: float | None, docs_ref: str | None, error: str | None) -> None:
+               seconds: float | None, docs_ref: str | None, error: str | None,
+               retrieved_ids: list[str] | None = None) -> None:
         with self.db.conn() as c:
             c.execute(
                 """UPDATE questions SET status = %s, answer_text = %s, citations = %s,
                        top_score = %s, provider = %s, model = %s, neurons = %s, llm_calls = %s,
-                       seconds = %s, docs_ref = %s, error = %s WHERE id = %s""",
+                       seconds = %s, docs_ref = %s, error = %s, retrieved_ids = %s
+                       WHERE id = %s""",
                 (status, answer_text, json.dumps(citations), top_score, provider, model,
-                 neurons, llm_calls, seconds, docs_ref, error, request_id))
+                 neurons, llm_calls, seconds, docs_ref, error,
+                 None if retrieved_ids is None else json.dumps(retrieved_ids), request_id))
 
     # ---- feedback ----
     def add_feedback(self, token_id: int, request_id: str, rating: int,

@@ -146,7 +146,8 @@ class AnswerService:
                 citations=[asdict(c) for c in a.citations], top_score=a.top_score,
                 provider=a.provider, model=a.model,
                 neurons=adapter.total_neurons if adapter.calls_made else None,
-                llm_calls=a.llm_calls, seconds=a.seconds, docs_ref=index.docs_ref, error=None)
+                llm_calls=a.llm_calls, seconds=a.seconds, docs_ref=index.docs_ref, error=None,
+                retrieved_ids=[h.piece_id for h in hits])
         except DbUnavailable:
             pass  # the answer exists and its neurons are spent: return it; the row stays reserved
         return AskResult(rid, a.status, a.text, a.citations, a.closest, index.docs_ref,

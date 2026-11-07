@@ -144,6 +144,14 @@ def test_happy_path_logs_answer_and_citations():
     assert budget == CFG.limits.global_daily_neurons
 
 
+def test_ask_logs_retrieved_piece_ids():
+    svc, usage, *_ = make()
+    svc.ask("good", "what does & do?")
+    ids = usage.finished[0][1]["retrieved_ids"]
+    assert ids and ids[0] == "join:0"  # rank order: the piece about `&` comes first
+    assert set(ids) <= {p.piece_id for p in PIECES}
+
+
 def test_below_threshold_abstains_without_adapter_call():
     store = FakeStore(vector_hits=(("rows:0", 0.5),))  # found by one search only: 1/61
     svc, usage, _, provider, made = make(store=store)

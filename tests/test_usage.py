@@ -132,6 +132,39 @@ def test_finish_stores_the_answer(usage):
     assert row == ("answered", "use gv", 12.5, "stable@abc")
 
 
+def _retrieved(u: Usage, rid: str):
+    with u.db.conn() as c:
+        return c.execute("SELECT retrieved_ids FROM questions WHERE id = %s", (rid,)).fetchone()[0]
+
+
+def test_finish_stores_retrieved_ids(usage):
+    tid = usage.token_id_for(usage.create_token("t-ann"))
+    rid = reserve(usage, tid).request_id
+    usage.finish(rid, status="answered", answer_text="ok", citations=[], top_score=0.03,
+                 provider="p", model="m", neurons=None, llm_calls=1, seconds=1.0,
+                 docs_ref="stable@abc", error=None, retrieved_ids=["a:1", "b:2"])
+    assert _retrieved(usage, rid) == ["a:1", "b:2"]
+
+
+def test_finish_without_retrieved_ids_leaves_null(usage):
+    tid = usage.token_id_for(usage.create_token("t-ann"))
+    rid = reserve(usage, tid).request_id
+    finish(usage, rid)
+    assert _retrieved(usage, rid) is None
+
+
+def test_init_schema_adds_column_to_an_existing_table(usage):
+    tid = usage.token_id_for(usage.create_token("t-ann"))
+    rid = reserve(usage, tid).request_id
+    with usage.db.conn() as c:
+        c.execute("ALTER TABLE questions DROP COLUMN retrieved_ids")
+    usage.init_schema()  # an old table, as production has it today
+    usage.finish(rid, status="answered", answer_text="ok", citations=[], top_score=0.03,
+                 provider="p", model="m", neurons=None, llm_calls=1, seconds=1.0,
+                 docs_ref="stable@abc", error=None, retrieved_ids=["a:1", "b:2"])
+    assert _retrieved(usage, rid) == ["a:1", "b:2"]
+
+
 def test_feedback_only_for_own_request(usage):
     a = usage.token_id_for(usage.create_token("t-a"))
     b = usage.token_id_for(usage.create_token("t-b"))
