@@ -310,7 +310,8 @@ def test_prompt_asks_for_a_newcomer_friendly_style():
     assert "simplest" in p                         # easiest method first
     assert "example" in p and "own" in p           # do not repeat the docs' sample data
     assert "full sentence" in p                    # no bare copied fragments
-    assert "press `z`, then `ctrl+s`" in p         # prefixed keys written out as two steps
+    assert "exactly as the excerpt writes" in p    # `gs gzd` is copied, never spelled out key by key
+    assert "user's own words" in p                 # lead with plain words, jargon comes after
     assert "one chord" in p and "never split" in p  # `Shift+F`, `Ctrl+S` stay whole
     assert "only what was asked" in p              # no extra settings, variants or methods
     assert "the excerpts' own names" in p          # do not invent names such as "commandlog"
