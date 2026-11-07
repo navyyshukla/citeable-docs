@@ -149,7 +149,7 @@ def test_ask_logs_retrieved_piece_ids():
     svc.ask("good", "what does & do?")
     ids = usage.finished[0][1]["retrieved_ids"]
     assert ids and ids[0] == "join:0"  # rank order: the piece about `&` comes first
-    assert set(ids) <= {p.piece_id for p in PIECES}
+    assert set(ids) <= {p.id for p in PIECES}
 
 
 def test_below_threshold_abstains_without_adapter_call():
