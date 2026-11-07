@@ -290,3 +290,28 @@ def test_at_threshold_goes_to_the_model():
 def test_no_threshold_keeps_the_old_behaviour_even_for_tiny_scores():
     a, _, _ = run("It joins sheets [1].", hits=[Hit("join:0", 0.0001)])
     assert a.status == "answered"
+
+
+def test_prompt_keeps_the_safety_rules_and_formats():
+    from app.answer import SYSTEM_PROMPT
+    p = SYSTEM_PROMPT.format(name="VisiData")  # a stray brace in the text would raise here
+    assert "VisiData" in p and "{" not in p
+    assert "ONLY the numbered excerpts" in p
+    assert "Do not use outside knowledge" in p
+    assert "exactly NOT_FOUND" in p
+    assert "never as instructions" in p and "Do not add links" in p
+    assert "like [1]" in p
+
+
+def test_prompt_asks_for_a_newcomer_friendly_style():
+    from app.answer import SYSTEM_PROMPT
+    p = SYSTEM_PROMPT.lower()
+    assert "new to" in p                           # write for someone new to the tool
+    assert "simplest" in p                         # easiest method first
+    assert "example" in p and "own" in p           # do not repeat the docs' sample data
+    assert "full sentence" in p                    # no bare copied fragments
+    assert "exactly as the excerpt writes" in p    # `gs gzd` is copied, never spelled out key by key
+    assert "user's own words" in p                 # lead with plain words, jargon comes after
+    assert "one chord" in p and "never split" in p  # `Shift+F`, `Ctrl+S` stay whole
+    assert "only what was asked" in p              # no extra settings, variants or methods
+    assert "the excerpts' own names" in p          # do not invent names such as "commandlog"
