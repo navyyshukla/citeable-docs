@@ -227,8 +227,20 @@ def test_token_create_prints_plain_token_once(monkeypatch, capsys):
     usage, _ = _admin(monkeypatch)
     assert main(["token", "create", "carol"]) == 0
     out = capsys.readouterr().out
-    assert out.count("PLAIN-TOKEN-123") == 1 and "carol" in out and "not be shown again" in out
+    # twice by design: on the token line and inside the invite link
+    assert out.count("PLAIN-TOKEN-123") == 2 and "carol" in out and "not be shown again" in out
     assert usage.created == ["carol"]
+
+
+def test_token_create_prints_invite_link_with_fragment(monkeypatch, capsys):
+    from app.config import load_config
+
+    _admin(monkeypatch)
+    site = load_config("config/visidata.yaml").site
+    assert main(["token", "create", "carol"]) == 0
+    out = capsys.readouterr().out
+    assert f"{site.url.rstrip('/')}/#t=PLAIN-TOKEN-123" in out
+    assert "?t=" not in out
 
 
 def test_token_create_duplicate_label_fails_cleanly(monkeypatch, capsys):

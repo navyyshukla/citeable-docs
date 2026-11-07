@@ -44,3 +44,25 @@ models:
 api:
   cors_origins:
     - https://navyyshukla.github.io
+site:
+  url: https://navyyshukla.github.io/citeable-docs/
+  api_base_url: https://citeable-docs-api.onrender.com
+  title: Ask the VisiData docs
+  intro: >-
+    VisiData is a free tool that runs in the terminal and works like a spreadsheet for data
+    files such as CSV. You drive it with the keyboard and can explore a file quickly. Ask
+    anything about using it; answers come only from its documentation, with links.
+  starter_questions:
+    - How do I rename a column?
+    - How can I convert a CSV file to another file type?
+    - How do I make a frequency table of a column?
+    - What does the ! key do to a column?
+  privacy_notice: >-
+    Your question and the answer are kept for 30 days, then deleted. Only the owner reads
+    questions. To answer, the text of your question is sent to Cloudflare and Groq (the AI
+    models), and the service runs on Render with its data in Neon.
+  known_wrong:
+    d-001: >-
+      The docs' sort page and VisiData's source code disagree on which of [ and ] sorts
+      high-to-low. The answer repeats what the docs say.
+    k-004: The docs excerpt on this topic is too vague to give a helpful answer.

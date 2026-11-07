@@ -148,6 +148,9 @@ def cmd_token(args) -> int:
             return 1
         print(f"token for {args.label}: {token}")
         print("Copy it now: it is stored only as a hash and will not be shown again.")
+        # The token goes after '#': browsers never send the fragment to any server.
+        site = load_config(args.config).site
+        print(f"invite link: {site.url.rstrip('/')}/#t={token}")
         return 0
     if args.action == "revoke":
         if not usage.revoke_token(args.label):

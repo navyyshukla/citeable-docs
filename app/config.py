@@ -64,12 +64,25 @@ class ApiCfg(_Strict):
     cors_origins: list[str]
 
 
+class SiteCfg(_Strict):
+    """The public chat page. Text lives here, not in code (project specifics are config)."""
+    url: str  # where the page is served; the invite link is built from it
+    api_base_url: str
+    title: str
+    intro: str  # for visitors who have never used the project
+    starter_questions: list[str] = Field(min_length=1, max_length=6)
+    privacy_notice: str
+    # eval question id -> a note shown on /evals for answers that are wrong because of the docs
+    known_wrong: dict[str, str] = {}
+
+
 class Config(_Strict):
     project: ProjectCfg
     search: SearchCfg = SearchCfg()
     limits: LimitsCfg = LimitsCfg()
     models: ModelsCfg
     api: ApiCfg
+    site: SiteCfg
 
 
 def load_config(path: Path | str) -> Config:

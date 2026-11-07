@@ -118,6 +118,11 @@ def create_app(service: AnswerService, cfg: Config) -> FastAPI:
 def build_from_env() -> FastAPI:
     """uvicorn --factory app.api:build_from_env. Nothing connects until the first request."""
     cfg = load_config(os.environ.get("CONFIG_PATH", "config/visidata.yaml"))
+    # Local page development only: Render never sets this, so production allows the listed
+    # origins and nothing else.
+    dev_origin = os.environ.get("DEV_CORS_ORIGIN")
+    if dev_origin:
+        cfg.api.cors_origins = [*cfg.api.cors_origins, dev_origin]
     dsn = os.environ["DATABASE_URL"]
     client = httpx.Client(timeout=60)  # shared by all requests; httpx clients are thread-safe
 

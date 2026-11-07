@@ -163,3 +163,35 @@ def test_wrongly_shaped_token_is_401_without_calling_the_service(client, svc, ju
     assert r.status_code == 401 and svc.asked == []
     r = client.post("/feedback", json={"request_id": "r", "rating": 1}, headers=auth(junk))
     assert r.status_code == 401 and svc.feedbacks == []
+
+
+def _env_client(monkeypatch, dev_origin):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setenv("CF_ACCOUNT_ID", "a")
+    monkeypatch.setenv("CF_API_TOKEN", "t")
+    monkeypatch.setenv("GROQ_API_KEY", "g")
+    if dev_origin:
+        monkeypatch.setenv("DEV_CORS_ORIGIN", dev_origin)
+    else:
+        monkeypatch.delenv("DEV_CORS_ORIGIN", raising=False)
+    return TestClient(build_from_env(), raise_server_exceptions=False)
+
+
+def _allowed(client, origin):
+    r = client.options("/ask", headers={"Origin": origin, "Access-Control-Request-Method": "POST",
+                                        "Access-Control-Request-Headers": "authorization"})
+    return r.headers.get("access-control-allow-origin")
+
+
+def test_cors_without_env_allows_only_configured_origins(monkeypatch):
+    c = _env_client(monkeypatch, None)
+    assert _allowed(c, GOOD) == GOOD
+    assert _allowed(c, "http://localhost:8080") is None
+
+
+def test_dev_cors_origin_env_adds_exactly_one_origin(monkeypatch):
+    c = _env_client(monkeypatch, "http://localhost:8080")
+    assert _allowed(c, "http://localhost:8080") == "http://localhost:8080"
+    assert _allowed(c, GOOD) == GOOD
+    assert _allowed(c, "http://localhost:9999") is None
+    assert _allowed(c, BAD) is None
