@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resultView, questionState, createBannerState } from "../src/view.js";
+import { resultView, questionState, createBannerState, pageState } from "../src/view.js";
 
 const CIT = [
   { n: 1, title: "Join › How to join", url: "https://www.visidata.org/docs/join/#how", docs_version: "3.0" },
@@ -95,4 +95,11 @@ test("the health check still hides its own waking banner, and errors are not hid
   assert.equal(b.current().kind, "error");
   b.hide(); // no kind: hides whatever is showing
   assert.equal(b.current(), null);
+});
+
+test("pageState: a forgotten device never shows a stale conversation", () => {
+  assert.equal(pageState({ hasToken: false, started: false }), "invite");
+  assert.equal(pageState({ hasToken: false, started: true }), "invite");
+  assert.equal(pageState({ hasToken: true, started: false }), "welcome");
+  assert.equal(pageState({ hasToken: true, started: true }), "chatting");
 });

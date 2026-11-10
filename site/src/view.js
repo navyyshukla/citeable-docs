@@ -60,3 +60,10 @@ export function createBannerState() {
     current() { return state; },
   };
 }
+
+// Which screen to show. No token means the invite screen, even if a conversation was started
+// earlier, so a forgotten device never shows a stale conversation.
+export function pageState({ hasToken, started }) {
+  if (!hasToken) return "invite";
+  return started ? "chatting" : "welcome";
+}

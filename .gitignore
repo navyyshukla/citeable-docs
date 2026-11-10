@@ -9,3 +9,4 @@ spikes/.cache/
 .superpowers/
 evals/results/
 _site/
+.DS_Store
