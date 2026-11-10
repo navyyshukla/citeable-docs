@@ -232,3 +232,10 @@ def test_identical_runs_say_same_in_every_run_not_a_zero_width_range():
 def test_history_rows_are_numbered_within_their_group():
     rep = report(runs=three_runs(), labels={})
     assert [h.name.split(":")[0] for h in rep.history] == ["run 1", "run 2", "run 3"]
+
+
+def test_hand_graded_line_says_earlier_run_when_there_are_several_runs():
+    multi = report(runs=three_runs(), labels={"a1": True})
+    assert stat(multi, "hand-graded correct").label == "hand-graded correct (from an earlier run)"
+    assert "hand-graded correct (from an earlier run)" in render_evals_html(multi, CFG)
+    assert stat(report(), "hand-graded correct").label == "hand-graded correct"  # one run: plain

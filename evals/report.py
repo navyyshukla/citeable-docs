@@ -150,7 +150,8 @@ def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, 
         per_run = [_headline(r, labels) for r in dev_runs]
         headline = [
             Stat(s.label, s.k, s.n, _rate_spread([p[i] for p in per_run]), len(per_run))
-            if not s.label.startswith("hand-graded") else s
+            if not s.label.startswith("hand-graded")
+            else Stat("hand-graded correct (from an earlier run)", s.k, s.n)
             for i, s in enumerate(headline)]
 
     n = len(c["answerable"])
