@@ -8,3 +8,4 @@ spikes/.cache/
 *.egg-info/
 .superpowers/
 evals/results/
+_site/
