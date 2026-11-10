@@ -97,3 +97,32 @@ def test_no_third_party_hosts_in_the_page(built):
     cfg = load_config(CONFIG)
     hosts = set(re.findall(r"https?://([^/\"'\s<>;]+)", built[2]))
     assert hosts <= {cfg.site.api_base_url.split("//")[1]}, hosts
+
+
+def test_evals_subcommand_writes_the_page_from_files(tmp_path):
+    import json
+    run = {"meta": {"split": "dev", "ref": "stable", "n_questions": 1},
+           "retrieval": {"hybrid": [{"id": "r-001", "mode": "hybrid", "answerable": True,
+                                     "hit": True, "top_ids": [], "top_scores": [], "error": None}]},
+           "answers": {"hybrid": [{"id": "r-001", "mode": "hybrid", "answerable": True,
+                                   "status": "answered", "abstained_correctly": None,
+                                   "invalid_citations": 0, "llm_calls": 1, "neurons": 1.0,
+                                   "seconds": 1.0, "cited_ids": ["sort:1"], "cited_gold": True,
+                                   "error": None, "question": "q", "text": "Use <b>.", "top_score": 0.03}]}}
+    (tmp_path / "run.json").write_text(json.dumps(run), encoding="utf-8")
+    (tmp_path / "labels.jsonl").write_text('{"question_id": "r-001", "correct": true}\n',
+                                           encoding="utf-8")
+    (tmp_path / "verdicts.json").write_text("[]", encoding="utf-8")
+    (tmp_path / "q.jsonl").write_text(
+        json.dumps({"id": "r-001", "question": "How do I sort?", "answerable": True,
+                    "gold_page": "sort", "source": "real", "split": "dev"}) + "\n",
+        encoding="utf-8")
+    from ingest.models import Piece
+    pieces = {"sort:1": Piece("sort:1", "sort", "Sort rows", "https://www.visidata.org/docs/sort/",
+                              "", ("Sort rows",), "t", "stable", None, None)}
+    out = tmp_path / "evals.html"
+    load_builder().build_evals(
+        load_config(CONFIG), [tmp_path / "run.json"], tmp_path / "labels.jsonl",
+        tmp_path / "verdicts.json", None, [tmp_path / "q.jsonl"], pieces, out)
+    page = out.read_text(encoding="utf-8")
+    assert "How do I sort?" in page and "Use &lt;b&gt;." in page and "1/1" in page
