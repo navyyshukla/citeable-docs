@@ -152,7 +152,7 @@ print("chat result:", json.dumps(chat.get("result"), indent=2)[:800])
 
 - [x] **Step 4: Run it**
 
-Run: `cd "/Users/navyshukla/Citeable-docs Project" && python3 -m venv .venv && source .venv/bin/activate && pip install -r spikes/requirements.txt && set -a && source .env && set +a && python spikes/s0_cloudflare_probe.py`
+Run: `cd <project folder> && python3 -m venv .venv && source .venv/bin/activate && pip install -r spikes/requirements.txt && set -a && source .env && set +a && python spikes/s0_cloudflare_probe.py`
 Expected: two `200` lines, an `EMBEDDING DIM: <number>` line, and the chat result keys including `response` (and ideally `usage`). Write the exact shapes and dim into `docs/spikes/s0-accounts.md`.
 
 - [x] **Step 5: Check the context window of the chat model**
