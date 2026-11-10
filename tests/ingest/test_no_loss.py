@@ -21,6 +21,15 @@ ALLOWED = {
 }
 
 
+_SCRIPT = re.compile(r"<script\b.*?</script>", re.DOTALL | re.IGNORECASE)
+
+
+def _without_scripts(text: str) -> str:
+    """Demo-player <script> blocks are page furniture the cleaner drops on purpose, so their
+    words (for example AsciinemaPlayer.create, document.getElementById) are not docs text."""
+    return _SCRIPT.sub(" ", text)
+
+
 def _words(text: str) -> set[str]:
     return set(re.findall(r"[A-Za-z]{3,}", text.lower()))
 
@@ -38,7 +47,19 @@ def test_real_docs_lose_only_known_noise_words():
             out: set[str] = set()
             for p in chunk_markdown(clean_markdown(raw).body, parts[2][:-3]):
                 out |= _words(p.text) | _words(" ".join(p.heading_path))
-            for w in _words(FRONT.sub("", raw)) - out:
+            for w in _words(_without_scripts(FRONT.sub("", raw))) - out:
                 lost.setdefault(w, []).append(parts[2])
     unexpected = {w: pages for w, pages in lost.items() if w not in ALLOWED}
     assert unexpected == {}, unexpected
+
+
+def test_script_blocks_are_not_counted_as_docs_text():
+    raw = (
+        "Press `create` to make a sheet.\n"
+        '<script type="text/javascript">\n'
+        "AsciinemaPlayer.create('x.cast', document.getElementById('player'));\n"
+        "</script>\n"
+    )
+    words = _words(_without_scripts(raw))
+    assert "create" in words  # real prose is still counted
+    assert not words & {"asciinemaplayer", "document", "getelementbyid", "player"}
