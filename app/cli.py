@@ -12,6 +12,7 @@ import httpx
 from app.config import load_config
 from app.db import Db
 from app.llm.build import build_adapter
+from app.llm.base import ProviderError
 from app.llm.cloudflare import CloudflareClient, embed_texts
 from app.llm.gemini import GeminiProvider
 from app.search import Searcher
@@ -21,11 +22,14 @@ from evals.runner import (RetrievalRow, run_answers, run_retrieval, summarize_an
                           write_results)
 from evals.judge import (JudgeVerdict, agreement, items_from_results, judge_answer,
                          load_labels)
+from evals.generate import (build_unanswerable_prompt, generate, parse_unanswerable,
+                            write_check_sheet)
 from evals.schema import load_questions
 from evals.threshold import threshold_table
 from ingest.fetch import fetch_docs_and_commit
 from ingest.pipeline import build_pieces
 
+MIN_PIECE_CHARS_FOR_QUESTIONS = 300  # shorter pieces rarely hold a question's answer
 MIN_PIECES = 100  # the real docs give about 230; fewer means a broken download or parse
 
 
@@ -223,6 +227,40 @@ def cmd_judge_agreement(args) -> int:
     return 0
 
 
+def cmd_generate_questions(args) -> int:
+    """Write synthetic eval questions with Gemini from the PUBLIC docs pieces (read-only).
+    Makes up to --limit + 1 Gemini calls, so run it only when you mean to spend them."""
+    cfg = load_config(args.config)
+    out = Path(args.out)
+    if out.exists():
+        print(f"{out} already exists: move it or choose another --out", file=sys.stderr)
+        return 1
+    pieces = sorted((p for p in _store(cfg).load_pieces(cfg.project.slug)
+                     if len(p.text) >= MIN_PIECE_CHARS_FOR_QUESTIONS), key=lambda p: p.id)
+    if not pieces:
+        print("no pieces long enough to write questions from; run ingest first", file=sys.stderr)
+        return 1
+    step = max(1, len(pieces) // max(1, args.limit))  # spread over the whole docs
+    chosen = pieces[::step][:args.limit]
+    existing = {q.question.lower() for q in load_questions(Path(args.data))}
+    provider = GeminiProvider(os.environ["GEMINI_API_KEY"], json_output=True)
+    questions = generate(chosen, provider, limit=args.limit, existing=existing)
+    if args.unanswerable:
+        titles = sorted({p.page_title for p in pieces})
+        system, user = build_unanswerable_prompt(titles, args.unanswerable)
+        try:
+            c = provider.complete(system, user, 600)
+            questions += parse_unanswerable(c.text, len(questions) + 1, existing | {
+                q.question.lower() for q in questions})
+        except ProviderError as e:
+            print(f"unanswerable questions skipped: {e}", file=sys.stderr)
+    out.write_text("".join(q.model_dump_json() + "\n" for q in questions), encoding="utf-8")
+    rows = write_check_sheet(questions, Path(args.sheet)) if args.sheet else 0
+    print(f"wrote {len(questions)} questions to {out}; {rows} rows in the hand-check sheet. "
+          "Read the sheet before using these questions.")
+    return 0
+
+
 def cmd_calibrate(args) -> int:
     """Print what each evidence threshold would do. Reads a saved file: no network, no neurons."""
     data = json.loads(Path(args.retrieval).read_text(encoding="utf-8"))
@@ -282,6 +320,13 @@ def main(argv: list[str] | None = None) -> int:
     j.add_argument("--mode", default="hybrid")
     j.add_argument("--out", required=True)
     j.add_argument("--config", default=argparse.SUPPRESS)
+    q = sub.add_parser("generate-questions")
+    q.add_argument("--out", required=True)
+    q.add_argument("--limit", type=int, default=25)
+    q.add_argument("--unanswerable", type=int, default=5)
+    q.add_argument("--sheet")
+    q.add_argument("--data", default="evals/data/dev.jsonl")
+    q.add_argument("--config", default=argparse.SUPPRESS)
     g = sub.add_parser("judge-agreement")
     g.add_argument("--verdicts", required=True)
     g.add_argument("--labels", required=True)
@@ -290,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
         p.error(f"token {args.action} needs a LABEL")
     return {"ingest": cmd_ingest, "eval": cmd_eval, "calibrate": cmd_calibrate,
             "init-db": cmd_init_db, "token": cmd_token, "purge": cmd_purge,
-            "serve": cmd_serve, "judge": cmd_judge,
+            "serve": cmd_serve, "judge": cmd_judge, "generate-questions": cmd_generate_questions,
             "judge-agreement": cmd_judge_agreement}[args.cmd](args)
 
 

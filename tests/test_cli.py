@@ -346,3 +346,47 @@ def test_judge_agreement_prints_precision_and_recall(tmp_path, capsys):
     assert main(["judge-agreement", "--verdicts", str(v), "--labels", str(lab)]) == 0
     out = capsys.readouterr().out
     assert "precision" in out and "recall" in out and "1.00" in out
+
+
+def test_generate_questions_writes_a_loadable_file_and_sheet_without_network(
+        monkeypatch, tmp_path, capsys):
+    import json as _json
+
+    from app.llm.base import Completion
+    from evals.schema import load_questions
+    from ingest.models import Piece
+
+    def mk(i):
+        return Piece(id=f"pg{i}:0", page_slug=f"pg{i}", page_title=f"Page {i}", url="https://x/",
+                     anchor="a", heading_path=(f"Page {i}", "H"), text="body text " * 40,
+                     docs_ref="stable@abc", docs_version="3", last_updated="2026-01-01")
+
+    class FakeStore:
+        def load_pieces(self, project):
+            return [mk(i) for i in range(6)]
+
+    class FakeGemini:
+        calls = 0
+
+        def __init__(self, key, **kw):
+            assert kw.get("json_output") is True
+
+        def complete(self, system, user, max_tokens):
+            FakeGemini.calls += 1
+            return Completion(_json.dumps({"questions": [f"generated {FakeGemini.calls} a?",
+                                                         f"generated {FakeGemini.calls} b?"]}),
+                              "gemini", "m", 1, 1, None, 0.1)
+
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli._store", lambda cfg: FakeStore())
+    monkeypatch.setattr("app.cli.GeminiProvider", FakeGemini)
+    monkeypatch.setattr("evals.generate.time.sleep", lambda s: None)
+    out, sheet = tmp_path / "syn.jsonl", tmp_path / "sheet.md"
+    assert main(["generate-questions", "--out", str(out), "--limit", "3", "--unanswerable", "2",
+                 "--sheet", str(sheet)]) == 0
+    qs = load_questions(out)
+    assert FakeGemini.calls == 4  # 3 pieces + 1 unanswerable call
+    assert sum(q.answerable for q in qs) == 6 and sum(not q.answerable for q in qs) == 2
+    assert sheet.exists() and "body text" not in out.read_text() + sheet.read_text()
+    assert main(["generate-questions", "--out", str(out)]) == 1  # refuses to overwrite
+    assert "already exists" in capsys.readouterr().err
