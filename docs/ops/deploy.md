@@ -51,5 +51,39 @@ service (dashboard -> Manual Deploy -> Restart) so it reloads them.
 
 ## Local front-end development
 
-`localhost` is not in the production CORS list (`api.cors_origins`). Plan 3 adds a local origin when
-the chat page is developed, and removes it before the beta.
+`localhost` is not in the production CORS list (`api.cors_origins`). To try the page against a
+local API, set one extra origin through the environment instead of editing the list:
+
+```
+DEV_CORS_ORIGIN=http://localhost:8080 .venv/bin/uvicorn app.api:app --factory
+python scripts/build_site.py page --out _site && python -m http.server -d _site 8080
+```
+
+Build a copy of the page whose `site.api_base_url` points at the local API (a temporary config
+file; never commit it). Create a throwaway invite with `token create --label <name>`, open the
+printed link, and revoke the token afterwards. Production never sets `DEV_CORS_ORIGIN`.
+
+## Enabling Pages (owner action, once)
+
+The page is a static site on GitHub Pages, deployed by `.github/workflows/pages.yml` on pushes to
+`main` that touch `site/**`, `config/visidata.yaml` or `scripts/build_site.py`. Before the first
+deploy: repository Settings -> Pages -> Source: **GitHub Actions**. The workflow uses no secrets.
+Check the live address matches `site.url` in `config/visidata.yaml` (invite links are built from it).
+
+## Building and reviewing `evals.html`
+
+The `/evals` page is built on the owner's machine from saved results, then committed as
+`site/public/evals.html` (the Pages workflow copies `site/public/*` next to `index.html`):
+
+```
+python scripts/build_site.py evals --run evals/results/<run>.json \
+  --labels evals/results/human-labels-v2.jsonl --verdicts evals/results/<verdicts>.json \
+  --out site/public/evals.html
+```
+
+It reads the pieces from the database read-only (`DATABASE_URL`) and spends no neurons or Gemini
+calls. Add `--run` once per saved run, `--trap <traps.json> --trap-verdicts <verdicts.json>` for the
+judge trap summary. Before committing, open the file and check: every rate shows k/n and a range;
+the judge is labelled "rough filter"; generated questions appear apart, as "AI-checked only,
+not human-checked"; the judge verdicts file matches the run shown. The page contains only
+paraphrased eval questions and the assistant's own answers, never friends' questions.
