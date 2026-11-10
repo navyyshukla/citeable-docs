@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from app.config import Config
 from evals.schema import EvalQuestion
-from evals.stats import fraction_text
+from evals.stats import fraction_text, spread
 from ingest.models import Piece
 
 DEV = "dev"
@@ -26,6 +26,9 @@ class Stat:
     label: str
     k: int
     n: int
+    # (lowest, highest) rate across repeated dev runs; None when there is only one run
+    spread: tuple[float, float] | None = None
+    runs: int = 0  # how many runs the spread covers
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,27 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
+def _headline(run: dict, labels: dict[str, bool]) -> list[Stat]:
+    c = _counts(_answer_rows(run))
+    graded = [labels[r["id"]] for r in c["answered"] if r["id"] in labels]
+    stats = [
+        Stat("unanswerable refused", c["refused"], c["unanswerable_n"]),
+        Stat("answerable answered with a valid citation", c["valid"], len(c["answerable"])),
+        Stat("invalid citations", c["invalid"], len(c["answered"])),
+        Stat("hand-graded correct", sum(graded), len(graded)),
+    ]
+    for mode, rrows in (run.get("retrieval") or {}).items():
+        ans = [r for r in rrows if r["answerable"]]
+        stats.append(Stat(f"right page in top 5 ({mode})",
+                          sum(1 for r in ans if r["hit"]), len(ans)))
+    return stats
+
+
+def _rate_spread(stats: list[Stat]) -> tuple[float, float] | None:
+    rates = [s.k / s.n for s in stats if s.n]
+    return spread(rates) if rates else None
+
+
 def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, dict],
                  trap: dict | None, questions: list[EvalQuestion], pieces: dict[str, Piece],
                  known_wrong: dict[str, str]) -> Report:
@@ -105,29 +129,29 @@ def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, 
         latest[g] = r
 
     history = []
+    seen_in_group: dict[str, int] = {}
     for g, r in grouped:
         c = _counts(_answer_rows(r))
+        seen_in_group[g] = seen_in_group.get(g, 0) + 1
         history.append(RunRow(
-            g, f"{r['meta'].get('ref', '?')}, {r['meta'].get('n_questions', '?')} questions",
+            g, f"run {seen_in_group[g]}: {r['meta'].get('ref', '?')}, "
+               f"{r['meta'].get('n_questions', '?')} questions",
             r["meta"].get("n_questions", 0),
             Stat("unanswerable refused", c["refused"], c["unanswerable_n"]),
             Stat("answerable answered with a valid citation", c["valid"], len(c["answerable"])),
             c["errors"]))
 
-    head = latest.get(DEV)  # generated questions never move the headline
+    dev_runs = [r for g, r in grouped if g == DEV]  # generated questions never feed the headline
+    head = dev_runs[-1] if dev_runs else None
     rows_head = _answer_rows(head) if head else []
     c = _counts(rows_head)
-    graded = [labels[r["id"]] for r in c["answered"] if r["id"] in labels]
-    headline = [
-        Stat("unanswerable refused", c["refused"], c["unanswerable_n"]),
-        Stat("answerable answered with a valid citation", c["valid"], len(c["answerable"])),
-        Stat("invalid citations", c["invalid"], len(c["answered"])),
-        Stat("hand-graded correct", sum(graded), len(graded)),
-    ]
-    for mode, rrows in ((head or {}).get("retrieval") or {}).items():
-        ans = [r for r in rrows if r["answerable"]]
-        headline.append(Stat(f"right page in top 5 ({mode})",
-                             sum(1 for r in ans if r["hit"]), len(ans)))
+    headline = _headline(head, labels) if head else _headline({"answers": {}}, labels)
+    if len(dev_runs) > 1:
+        per_run = [_headline(r, labels) for r in dev_runs]
+        headline = [
+            Stat(s.label, s.k, s.n, _rate_spread([p[i] for p in per_run]), len(per_run))
+            if not s.label.startswith("hand-graded") else s
+            for i, s in enumerate(headline)]
 
     n = len(c["answerable"])
     honesty = [f"This is {n} answerable and {c['unanswerable_n']} unanswerable questions, a small "
@@ -138,6 +162,11 @@ def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, 
     if c["errors"]:
         honesty.append(f"{_plural(c['errors'], 'question')} errored in the latest run (not "
                        "counted as answers, refusals or misses).")
+    if len(dev_runs) > 1:
+        honesty.append(f"The numbers above are the latest of {len(dev_runs)} runs on the same "
+                       "questions; the range shows how much they moved between runs. Hand grades "
+                       "were made on earlier wording: an answer worded differently in a later run "
+                       "was not graded again.")
     judged = [verdicts[r["id"]]["correct"] for r in c["answered"]
               if isinstance(verdicts.get(r["id"], {}).get("correct"), bool)]
     if judged:
@@ -168,7 +197,13 @@ def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, 
 
 
 def _stat_li(s: Stat) -> str:
-    return f"<li><span>{html.escape(s.label)}</span> <strong>{fraction_text(s.k, s.n)}</strong></li>"
+    rng = ""
+    if s.spread:
+        lo, hi = round(s.spread[0] * 100), round(s.spread[1] * 100)
+        rng = (f" <small>same in all {s.runs} runs</small>" if lo == hi
+               else f" <small>across {s.runs} runs: {lo}%–{hi}%</small>")
+    return (f"<li><span>{html.escape(s.label)}</span> "
+            f"<strong>{fraction_text(s.k, s.n)}</strong>{rng}</li>")
 
 
 def _link(title: str, url: str) -> str:

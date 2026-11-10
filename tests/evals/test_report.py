@@ -179,3 +179,56 @@ def test_point_size_rounds(n, points):
     qs = [q(f"x{i}") for i in range(n)]
     rep = report(answers=answers, retrieval=[], labels={}, questions=qs)
     assert f"about {points} points" in " ".join(rep.honesty)
+
+
+def three_runs():
+    """Same 4 answerable questions; answered 4, 3, 3 -> 'answered with a valid citation' 4/4, 3/4, 3/4."""
+    def mk(abstain):
+        rows = [arow(i, status="abstained" if i in abstain else "answered",
+                     text=None if i in abstain else "x") for i in ("a1", "a2", "a3", "a4")]
+        rows += [arow("u1", False, "abstained", text=None, abstained_correctly=True),
+                 arow("u2", False, "abstained", text=None, abstained_correctly=True)]
+        return run(rows, RETRIEVAL)
+    return [mk(set()), mk({"a4"}), mk({"a3"})]
+
+
+def test_headline_shows_the_range_across_dev_runs():
+    rep = report(runs=three_runs(), labels={})
+    s = stat(rep, "answerable answered with a valid citation")
+    assert (s.k, s.n) == (3, 4)  # the latest run still gives the counts
+    assert s.spread == (0.75, 1.0)  # lowest and highest rate over the three runs
+    html = render_evals_html(rep, CFG)
+    assert "across 3 runs: 75%–100%" in html
+
+
+def test_single_run_headline_has_no_spread():
+    rep = report()
+    assert stat(rep, "unanswerable refused").spread is None
+    assert "across" not in render_evals_html(rep, CFG).split("How much to trust")[0]
+
+
+def test_synthetic_runs_never_enter_the_spread():
+    synth = run([arow("s1"), arow("s2", status="abstained", text=None)],
+                [rrow("s1", True), rrow("s2", True)])
+    synth_q = [q("s1", source="synthetic"), q("s2", source="synthetic")]
+    rep = report(runs=three_runs() + [synth], labels={}, questions=QUESTIONS + synth_q)
+    s = stat(rep, "answerable answered with a valid citation")
+    assert s.spread == (0.75, 1.0)
+
+
+def test_multi_run_honesty_says_hand_grades_come_from_earlier_wording():
+    rep = report(runs=three_runs(), labels={"a1": True})
+    assert any("hand grades" in t.lower() and "earlier" in t.lower() for t in rep.honesty)
+    assert not any("earlier" in t.lower() for t in report().honesty)
+
+
+def test_identical_runs_say_same_in_every_run_not_a_zero_width_range():
+    rep = report(runs=[run(ANSWERS, RETRIEVAL), run(ANSWERS, RETRIEVAL)], labels={})
+    html = render_evals_html(rep, CFG)
+    assert "same in all 2 runs" in html
+    assert "100%–100%" not in html
+
+
+def test_history_rows_are_numbered_within_their_group():
+    rep = report(runs=three_runs(), labels={})
+    assert [h.name.split(":")[0] for h in rep.history] == ["run 1", "run 2", "run 3"]
