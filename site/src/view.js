@@ -49,3 +49,14 @@ export function questionState(value, max) {
   const tooLong = count > max;
   return { count, tooLong, canAsk: count > 0 && !tooLong };
 }
+
+// Which banner is showing. A later message of one kind must not remove a different kind: the
+// health check hides only its own "waking" banner, never the "invite not saved" warning.
+export function createBannerState() {
+  let state = null;
+  return {
+    show(message, kind = "info") { state = { message, kind }; },
+    hide(onlyKind) { if (!onlyKind || (state && state.kind === onlyKind)) state = null; },
+    current() { return state; },
+  };
+}

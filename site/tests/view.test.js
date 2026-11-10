@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resultView, questionState } from "../src/view.js";
+import { resultView, questionState, createBannerState } from "../src/view.js";
 
 const CIT = [
   { n: 1, title: "Join › How to join", url: "https://www.visidata.org/docs/join/#how", docs_version: "3.0" },
@@ -75,4 +75,24 @@ test("questionState trims like the server and counts characters, not UTF-16 unit
 test("questionState survives non-strings", () => {
   assert.equal(questionState(null, 500).canAsk, false);
   assert.equal(questionState(undefined, 500).count, 0);
+});
+
+test("the 'invite not saved' warning survives the health check finishing", () => {
+  const b = createBannerState();
+  b.show("Your browser would not save the invite link.", "warn");
+  b.hide("info"); // what the health check does when the server answers
+  assert.equal(b.current().message, "Your browser would not save the invite link.");
+  assert.equal(b.current().kind, "warn");
+});
+
+test("the health check still hides its own waking banner, and errors are not hidden by it", () => {
+  const b = createBannerState();
+  b.show("Waking the server up…", "info");
+  b.hide("info");
+  assert.equal(b.current(), null);
+  b.show("Couldn't reach the server.", "error");
+  b.hide("info");
+  assert.equal(b.current().kind, "error");
+  b.hide(); // no kind: hides whatever is showing
+  assert.equal(b.current(), null);
 });

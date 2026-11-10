@@ -3,7 +3,7 @@
 // output of the safe renderer (render.js).
 import { createApi } from "./api.js";
 import { loadToken, saveToken, forgetToken } from "./token.js";
-import { resultView, questionState } from "./view.js";
+import { resultView, questionState, createBannerState } from "./view.js";
 
 const $ = (id) => document.getElementById(id);
 const config = JSON.parse($("page-config").textContent);
@@ -25,18 +25,22 @@ const counter = $("counter");
 const banner = $("banner");
 let token = null;
 let busy = false;
-let bannerKind = null;
+const bannerState = createBannerState();
 
+function renderBanner() {
+  const b = bannerState.current();
+  banner.hidden = !b;
+  if (!b) return;
+  banner.textContent = b.message;
+  banner.className = b.kind === "error" ? "error" : "";
+}
 function showBanner(message, kind = "info") {
-  banner.textContent = message;
-  banner.className = kind === "error" ? "error" : "";
-  banner.hidden = false;
-  bannerKind = kind;
+  bannerState.show(message, kind);
+  renderBanner();
 }
 function hideBanner(onlyKind) {
-  if (onlyKind && bannerKind !== onlyKind) return;
-  banner.hidden = true;
-  bannerKind = null;
+  bannerState.hide(onlyKind);
+  renderBanner();
 }
 
 function updateControls() {
@@ -181,7 +185,7 @@ if (loaded.fromLink) {
   if (saveToken(storage, token)) {
     history.replaceState(null, "", location.pathname + location.search); // token out of the address bar
   } else {
-    showBanner("Your browser would not save the invite link. Keep this link: you will need it again.");
+    showBanner("Your browser would not save the invite link. Keep this link: you will need it again.", "warn");
   }
 }
 if (!token) {

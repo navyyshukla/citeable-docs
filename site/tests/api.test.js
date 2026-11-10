@@ -117,20 +117,28 @@ test("a fetch that never resolves is cut off at timeoutMs", async (t) => {
   t.mock.timers.tick(1);
   await assert.rejects(pending, (e) => {
     assert.equal(e.status, null);
-    assert.match(e.message, /Couldn't reach the server/);
+    // not "check your connection": the server may still be working on the question
+    assert.match(e.message, /took too long/);
+    assert.doesNotMatch(e.message, /Check your connection/);
     return true;
   });
 });
 
-test("the default timeout is above the 22.9 s cold start", async (t) => {
+test("a failed connection still says to check the connection", async () => {
+  const boom = async () => { throw new Error("offline"); };
+  await assert.rejects(createApi({ baseUrl: BASE, fetchFn: boom }).ask(TOKEN, "q"),
+    (e) => /Check your connection/.test(e.message));
+});
+
+test("the default timeout covers a cold start plus a slow answer (90 s)", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const hang = () => new Promise(() => {});
   const pending = createApi({ baseUrl: BASE, fetchFn: hang }).ask(TOKEN, "q");
-  t.mock.timers.tick(30000);
+  t.mock.timers.tick(60000);
   let settled = false;
   pending.catch(() => {}).finally(() => { settled = true; });
-  await Promise.resolve();
-  assert.equal(settled, false); // still waiting at 30 s
-  t.mock.timers.tick(15000);
+  await new Promise((resolve) => setImmediate(resolve)); // let any rejection settle first
+  assert.equal(settled, false); // still waiting at 60 s: 22.9 s cold start + a 26 s answer fits
+  t.mock.timers.tick(30000);
   await assert.rejects(pending);
 });

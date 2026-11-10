@@ -128,12 +128,20 @@ def _page_hit(row: dict, by_id: dict[str, EvalQuestion], pieces: dict[str, Piece
 
 
 def _across_runs(runs: list[dict], labels, by_id, pieces) -> list[Stat]:
-    """Latest run's counts, with the range over all the given runs when there are several."""
+    """Latest run's counts, with the range over the runs that have that same stat.
+
+    Stats are matched by label, never by position: runs may have used different retrieval
+    modes. A run with no data (n = 0) for a stat is left out of its range and its run count.
+    """
     per_run = [_headline(r, labels, by_id, pieces) for r in runs]
-    if len(runs) == 1:
-        return per_run[0]
-    return [Stat(s.label, s.k, s.n, _rate_spread([p[i] for p in per_run]), len(per_run))
-            for i, s in enumerate(per_run[-1])]
+    out = []
+    for s in per_run[-1]:
+        usable = [x for p in per_run for x in p if x.label == s.label and x.n]
+        if len(usable) > 1:
+            out.append(Stat(s.label, s.k, s.n, _rate_spread(usable), len(usable)))
+        else:
+            out.append(s)
+    return out
 
 
 def _rate_spread(stats: list[Stat]) -> tuple[float, float] | None:

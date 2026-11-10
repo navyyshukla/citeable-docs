@@ -1,7 +1,9 @@
 // API client. Every failure becomes an ApiError with a plain-language message (status is null
-// for network failures and timeouts). The default timeout is above the measured 22.9 s cold start.
+// for network failures and timeouts). The default timeout (90 s) covers the measured 22.9 s cold start plus a slow answer (about 26 s).
 
 const NETWORK = "Couldn't reach the server. Check your connection and try again.";
+// A timeout is not a dead connection: the server may still be finishing the answer.
+const TIMEOUT = "This took too long. The server may still be finishing; wait a minute, then try again.";
 
 export function describeError(status, body) {
   const text = body && typeof body.error === "string" ? body.error : null;
@@ -23,7 +25,7 @@ export class ApiError extends Error {
   }
 }
 
-export function createApi({ baseUrl, fetchFn, timeoutMs = 45000 }) {
+export function createApi({ baseUrl, fetchFn, timeoutMs = 90000 }) {
   const base = String(baseUrl).replace(/\/+$/, "");
   const doFetch = fetchFn || ((...args) => globalThis.fetch(...args));
 
@@ -33,7 +35,7 @@ export function createApi({ baseUrl, fetchFn, timeoutMs = 45000 }) {
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(() => {
         ctrl.abort();
-        reject(new ApiError(null, null));
+        reject(new ApiError(null, null, TIMEOUT));
       }, timeoutMs);
     });
     const work = (async () => {

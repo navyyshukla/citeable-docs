@@ -299,3 +299,31 @@ def test_generated_group_gets_its_own_stats_with_the_range_and_a_label():
 
 def test_no_generated_runs_means_no_generated_stats():
     assert report().generated == []
+
+
+def test_spread_pairs_stats_by_label_not_by_position():
+    """An earlier run with two modes, the latest with hybrid only: hybrid's range must use only hybrid."""
+    two = run(ANSWERS, RETRIEVAL, modes=("keyword", "hybrid"))
+    two["retrieval"]["keyword"] = [rrow(r["id"], False, r["answerable"], "keyword")
+                                   for r in RETRIEVAL]  # keyword finds nothing
+    one = run(ANSWERS, RETRIEVAL, modes=("hybrid",))
+    rep = report(runs=[two, one], labels={})
+    hybrid = stat(rep, "right page in top 5 (hybrid)")
+    assert (hybrid.k, hybrid.n) == (3, 4)
+    assert hybrid.spread == (0.75, 0.75)  # not dragged to 0% by the keyword rate
+    assert hybrid.runs == 2
+
+
+def test_spread_does_not_crash_when_the_latest_run_has_more_modes():
+    two = run(ANSWERS, RETRIEVAL, modes=("keyword", "hybrid"))
+    one = run(ANSWERS, RETRIEVAL, modes=("hybrid",))
+    rep = report(runs=[one, two], labels={})  # latest has the extra mode
+    keyword = stat(rep, "right page in top 5 (keyword)")
+    assert keyword.spread is None and keyword.runs == 0  # only one run has it: no range
+    assert stat(rep, "right page in top 5 (hybrid)").runs == 2
+
+
+def test_a_run_with_no_data_for_a_stat_is_not_counted_in_its_range():
+    empty = run([], [])
+    rep = report(runs=[empty, run(ANSWERS, RETRIEVAL), run(ANSWERS, RETRIEVAL)], labels={})
+    assert stat(rep, "unanswerable refused").runs == 2
