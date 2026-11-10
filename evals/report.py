@@ -5,7 +5,7 @@ verdicts and the pieces, and builds one static HTML page. Every rate shows k/n a
 (evals.stats), and the page says in plain words what a number cannot see.
 """
 import html
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.config import Config
 from evals.schema import EvalQuestion
@@ -62,6 +62,7 @@ class Report:
     known_wrong: list[tuple[str, str]]
     history: list[RunRow]
     rows: list[QuestionRow]
+    generated: list[Stat] = field(default_factory=list)  # stats for the generated-question runs
 
 
 def _answer_rows(run: dict) -> list[dict]:
@@ -98,7 +99,8 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
-def _headline(run: dict, labels: dict[str, bool]) -> list[Stat]:
+def _headline(run: dict, labels: dict[str, bool], by_id: dict[str, EvalQuestion],
+              pieces: dict[str, Piece]) -> list[Stat]:
     c = _counts(_answer_rows(run))
     graded = [labels[r["id"]] for r in c["answered"] if r["id"] in labels]
     stats = [
@@ -111,7 +113,27 @@ def _headline(run: dict, labels: dict[str, bool]) -> list[Stat]:
         ans = [r for r in rrows if r["answerable"]]
         stats.append(Stat(f"right page in top 5 ({mode})",
                           sum(1 for r in ans if r["hit"]), len(ans)))
+        stats.append(Stat(f"right page (any section) in top 5 ({mode})",
+                          sum(1 for r in ans if _page_hit(r, by_id, pieces)), len(ans)))
     return stats
+
+
+def _page_hit(row: dict, by_id: dict[str, EvalQuestion], pieces: dict[str, Piece]) -> bool:
+    """Looser than the exact hit: any piece of a gold page counts, whatever its heading."""
+    q = by_id.get(row["id"])
+    if q is None or q.gold_page is None:
+        return False
+    wanted = {q.gold_page, *q.also_gold_pages}
+    return any(pieces[i].page_slug in wanted for i in row.get("top_ids") or [] if i in pieces)
+
+
+def _across_runs(runs: list[dict], labels, by_id, pieces) -> list[Stat]:
+    """Latest run's counts, with the range over all the given runs when there are several."""
+    per_run = [_headline(r, labels, by_id, pieces) for r in runs]
+    if len(runs) == 1:
+        return per_run[0]
+    return [Stat(s.label, s.k, s.n, _rate_spread([p[i] for p in per_run]), len(per_run))
+            for i, s in enumerate(per_run[-1])]
 
 
 def _rate_spread(stats: list[Stat]) -> tuple[float, float] | None:
@@ -145,14 +167,14 @@ def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, 
     head = dev_runs[-1] if dev_runs else None
     rows_head = _answer_rows(head) if head else []
     c = _counts(rows_head)
-    headline = _headline(head, labels) if head else _headline({"answers": {}}, labels)
+    headline = _across_runs(dev_runs, labels, by_id, pieces) if dev_runs else _headline(
+        {"answers": {}}, labels, by_id, pieces)
     if len(dev_runs) > 1:
-        per_run = [_headline(r, labels) for r in dev_runs]
-        headline = [
-            Stat(s.label, s.k, s.n, _rate_spread([p[i] for p in per_run]), len(per_run))
-            if not s.label.startswith("hand-graded")
-            else Stat("hand-graded correct (from an earlier run)", s.k, s.n)
-            for i, s in enumerate(headline)]
+        headline = [Stat("hand-graded correct (from an earlier run)", s.k, s.n)
+                    if s.label.startswith("hand-graded") else s for s in headline]
+    synth_runs = [r for g, r in grouped if g == SYNTHETIC]
+    generated = [s for s in _across_runs(synth_runs, {}, by_id, pieces)
+                 if not s.label.startswith("hand-graded")] if synth_runs else []
 
     n = len(c["answerable"])
     honesty = [f"This is {n} answerable and {c['unanswerable_n']} unanswerable questions, a small "
@@ -194,7 +216,7 @@ def build_report(runs: list[dict], labels: dict[str, bool], verdicts: dict[str, 
                 labels.get(a["id"]), v if isinstance(v, bool) else None,
                 known_wrong.get(a["id"])))
 
-    return Report(headline, honesty, sorted(known_wrong.items()), history, rows)
+    return Report(headline, honesty, sorted(known_wrong.items()), history, rows, generated)
 
 
 def _stat_li(s: Stat) -> str:
@@ -262,7 +284,10 @@ def render_evals_html(report: Report, cfg: Config) -> str:
     for g in (DEV, SYNTHETIC):
         hs = [h for h in report.history if h.group == g]
         if hs:
-            out.append(f"<h3>{esc(g)}</h3><p>{esc(GROUP_NOTE[g])}</p><ul>")
+            out.append(f"<h3>{esc(g)}</h3><p>{esc(GROUP_NOTE[g])}</p>")
+            if g == SYNTHETIC and report.generated:
+                out.append("<ul>" + "".join(_stat_li(s) for s in report.generated) + "</ul>")
+            out.append("<ul>")
             for h in hs:
                 out.append(f"<li>{esc(h.name)}: {fraction_text(h.refused.k, h.refused.n)} refused; "
                            f"{fraction_text(h.valid_citation.k, h.valid_citation.n)} cited; "

@@ -239,3 +239,63 @@ def test_hand_graded_line_says_earlier_run_when_there_are_several_runs():
     assert stat(multi, "hand-graded correct").label == "hand-graded correct (from an earlier run)"
     assert "hand-graded correct (from an earlier run)" in render_evals_html(multi, CFG)
     assert stat(report(), "hand-graded correct").label == "hand-graded correct"  # one run: plain
+
+
+def loose_setup():
+    """4 answerable: a1 exact hit, a3 right page wrong section, a2 nothing, a4 a different page."""
+    def r(id, hit, top):
+        x = rrow(id, hit)
+        x["top_ids"] = top
+        return x
+    retrieval = [r("a1", True, ["sort:1"]), r("a3", False, ["sort:1"]),
+                 r("a2", False, []), r("a4", False, ["other:1"])]
+    pieces = {"sort:1": piece("sort:1"),
+              "other:1": Piece("other:1", "other", "Other", "https://www.visidata.org/docs/o/",
+                               "", ("Other",), "t", "stable", None, None)}
+    return retrieval, pieces
+
+
+def test_page_level_hit_counts_right_page_even_with_the_wrong_section():
+    retrieval, pieces = loose_setup()
+    rep = report(retrieval=retrieval, pieces=pieces)
+    assert stat(rep, "right page in top 5 (hybrid)") == Stat("right page in top 5 (hybrid)", 1, 4)
+    loose = stat(rep, "right page (any section) in top 5 (hybrid)")
+    assert (loose.k, loose.n) == (2, 4)
+
+
+def test_also_gold_pages_count_for_the_page_level_hit():
+    retrieval, pieces = loose_setup()
+    qs = [x if x.id != "a4" else EvalQuestion(id="a4", question="q?", answerable=True,
+                                              gold_page="sort", also_gold_pages=["other"],
+                                              source="real", split="dev")
+          for x in QUESTIONS]
+    rep = report(retrieval=retrieval, pieces=pieces, questions=qs)
+    assert stat(rep, "right page (any section) in top 5 (hybrid)").k == 3
+
+
+def test_generated_group_gets_its_own_stats_with_the_range_and_a_label():
+    retrieval, pieces = loose_setup()
+    synth_q = [q("s1", source="synthetic"), q("s2", source="synthetic")]
+    def srun(hits):
+        rows = [rrow("s1", hits[0]), rrow("s2", hits[1])]
+        for x in rows:
+            x["top_ids"] = ["sort:1"]
+        return run([arow("s1"), arow("s2", status="abstained", text=None)], rows)
+    rep = report(runs=[run(ANSWERS, RETRIEVAL), srun([True, False]), srun([True, True])],
+                 questions=QUESTIONS + synth_q, pieces=pieces, labels={})
+    by = {s.label: s for s in rep.generated}
+    assert by["right page in top 5 (hybrid)"].spread == (0.5, 1.0)
+    assert by["right page (any section) in top 5 (hybrid)"].spread == (1.0, 1.0)
+    assert not any(s.label.startswith("hand-graded") for s in rep.generated)
+    html = render_evals_html(rep, CFG)
+    synthetic_part = html.split("<h3>synthetic</h3>")[1].split("<h2>Every answer</h2>")[0]
+    assert "AI-checked only, not human-checked" in synthetic_part
+    assert synthetic_part.index("AI-checked only") < synthetic_part.index(
+        "right page (any section) in top 5 (hybrid)")
+    assert "across 2 runs: 50%–100%" in synthetic_part
+    # the dev headline is untouched by generated runs
+    assert stat(rep, "unanswerable refused").n == 2
+
+
+def test_no_generated_runs_means_no_generated_stats():
+    assert report().generated == []
