@@ -30,8 +30,9 @@ def test_page_has_config_text(built):
     cfg = load_config(CONFIG)
     text = htmllib.unescape(html)  # browsers decode &#x27; and friends, so compare decoded text
     assert cfg.site.title in text
-    assert cfg.site.intro.strip() in text
-    for q in cfg.site.starter_questions:
+    for t in (cfg.site.brand, cfg.site.greeting, cfg.site.tagline):
+        assert t in text
+    for q in cfg.site.starter_questions[:3]:  # the page shows the first three
         assert q in text
     assert cfg.site.privacy_notice.strip() in text
     assert cfg.project.license_note in text
@@ -44,11 +45,14 @@ def test_no_unfilled_placeholders(built):
 def test_hostile_config_text_is_escaped(tmp_path):
     cfg = load_config(CONFIG)
     cfg.site.title = "a <b>&"
-    cfg.site.intro = '<img src=x onerror="1"> & "quotes"'
+    cfg.site.brand = "<i>brand</i>"
+    cfg.site.greeting = '<img src=x onerror="1"> & "quotes"'
+    cfg.site.tagline = "<u>tag</u>"
     cfg.site.starter_questions = ["x <script>alert(1)</script>?"]
     cfg.site.privacy_notice = "p </script><script>evil()</script>"
     html = load_builder().build_page(cfg, tmp_path).read_text(encoding="utf-8")
     assert "a &lt;b&gt;&amp;" in html
+    assert "<i>brand" not in html and "<u>tag" not in html
     assert "<img" not in html and "<script>alert" not in html and "<script>evil" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
@@ -79,7 +83,8 @@ def test_json_block_cannot_close_the_script_early(tmp_path):
 def test_evals_page_is_linked_and_files_copied(built):
     out, _, html = built
     assert 'href="evals.html"' in html
-    for name in ("render.js", "token.js", "api.js", "view.js", "app.js", "style.css"):
+    for name in ("render.js", "token.js", "api.js", "view.js", "app.js", "style.css", "theme.js",
+                 "theme-init.js", "input.js", "cards.js"):
         assert (out / "src" / name).is_file(), name
 
 
@@ -96,7 +101,51 @@ def test_page_config_carries_the_limit_and_api_base(built):
 def test_no_third_party_hosts_in_the_page(built):
     cfg = load_config(CONFIG)
     hosts = set(re.findall(r"https?://([^/\"'\s<>;]+)", built[2]))
-    assert hosts <= {cfg.site.api_base_url.split("//")[1]}, hosts
+    allowed = {cfg.site.api_base_url.split("//")[1], cfg.site.about_url.split("//")[1].split("/")[0]}
+    if cfg.site.intro_video_url:
+        allowed.add(cfg.site.intro_video_url.split("//")[1].split("/")[0])
+    assert hosts <= allowed, hosts
+
+
+def test_only_three_starters_are_shown(tmp_path):
+    cfg = load_config(CONFIG)
+    cfg.site.starter_questions = [f"Question number {i}?" for i in range(5)]
+    html = load_builder().build_page(cfg, tmp_path).read_text(encoding="utf-8")
+    assert html.count('class="starter"') == 3
+    assert "Question number 2?" in html and "Question number 3?" not in html
+
+
+def test_links_open_safely(tmp_path):
+    cfg = load_config(CONFIG)
+    cfg.site.intro_video_url = None
+    html = load_builder().build_page(cfg, tmp_path / "a").read_text(encoding="utf-8")
+    assert "Intro video" not in html
+    about = re.findall(r'<a [^>]*href="%s"[^>]*>' % re.escape(cfg.site.about_url), html)
+    assert len(about) == 2  # top bar and hero
+    for tag in about:
+        assert 'rel="noopener noreferrer"' in tag and 'target="_blank"' in tag
+    cfg.site.intro_video_url = "https://video.example/watch"
+    html = load_builder().build_page(cfg, tmp_path / "b").read_text(encoding="utf-8")
+    vid = re.findall(r'<a [^>]*href="https://video\.example/watch"[^>]*>', html)
+    assert len(vid) == 2
+    for tag in vid:
+        assert 'rel="noopener noreferrer"' in tag and 'target="_blank"' in tag
+    assert html.count("Intro video") == 2
+
+
+def test_theme_init_script_is_external_and_in_the_head(built):
+    html = built[2]
+    m = re.search(r'<script\b([^>]*)\bsrc="src/theme-init\.js"([^>]*)>', html)
+    assert m, "theme-init.js must be loaded"
+    attrs = m.group(1) + m.group(2)
+    assert not re.search(r"\b(async|defer|type)\b", attrs)
+    assert m.start() < html.index("<body")
+    inline = [t for t in re.findall(r"<script\b([^>]*)>", html) if "src=" not in t]
+    assert len(inline) == 1 and 'type="application/json"' in inline[0]
+
+
+def test_page_state_starts_as_welcome(built):
+    assert re.search(r'<body class="chat" data-state="welcome">', built[2])
 
 
 def test_evals_subcommand_writes_the_page_from_files(tmp_path):

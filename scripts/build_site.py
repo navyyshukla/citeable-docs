@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from app.config import Config, load_config  # noqa: E402
 
 SITE = ROOT / "site"
+STARTERS_SHOWN = 3  # the welcome screen has room for three; the rest stay in config
 
 
 def _csp(api_base_url: str) -> str:
@@ -32,10 +33,17 @@ def build_page(cfg: Config, out_dir: Path) -> Path:
     esc = html.escape
     starters = "\n".join(
         f'      <button type="button" class="starter" data-question="{esc(q)}">{esc(q)}</button>'
-        for q in cfg.site.starter_questions)
+        for q in cfg.site.starter_questions[:STARTERS_SHOWN])
+    link = '<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>'
+    links = link.format(esc(cfg.site.about_url), "What is VisiData? ↗")
+    if cfg.site.intro_video_url:
+        links += link.format(esc(cfg.site.intro_video_url), "▶ Intro video")
     values = {
         "title": esc(cfg.site.title),
-        "intro": esc(cfg.site.intro.strip()),
+        "brand": esc(cfg.site.brand),
+        "greeting": esc(cfg.site.greeting),
+        "tagline": esc(" ".join(cfg.site.tagline.split())),
+        "links": links,
         "starters": starters,
         "privacy_notice": esc(cfg.site.privacy_notice.strip()),
         "license_note": esc(cfg.project.license_note),

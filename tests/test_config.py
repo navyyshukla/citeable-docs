@@ -114,3 +114,38 @@ def test_site_urls_are_https_and_the_known_wrong_ids_are_listed():
     cfg = load_config(CONFIG)
     assert cfg.site.url.startswith("https://") and cfg.site.api_base_url.startswith("https://")
     assert set(cfg.site.known_wrong) == {"d-001", "k-004"}
+
+
+@pytest.mark.parametrize("key", ["brand", "greeting", "tagline", "about_url"])
+def test_new_site_keys_are_required_and_non_empty(tmp_path, key):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["site"].pop(key)))
+    if key != "about_url":
+        with pytest.raises(ValidationError):
+            load_config(_variant(tmp_path, lambda d: d["site"].update({key: ""})))
+
+
+@pytest.mark.parametrize("key", ["about_url", "intro_video_url"])
+@pytest.mark.parametrize("bad", ["javascript:alert(1)", "http://x.example",
+                                 "https://x.example/a b", 'https://x.example/"onclick='])
+def test_site_urls_must_be_https_without_unsafe_characters(tmp_path, key, bad):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["site"].update({key: bad})))
+
+
+def test_intro_video_url_is_optional(tmp_path):
+    assert load_config(CONFIG).site.intro_video_url is None
+    cfg = load_config(_variant(tmp_path, lambda d: d["site"].update(
+        intro_video_url="https://video.example/watch")))
+    assert cfg.site.intro_video_url == "https://video.example/watch"
+
+
+def test_intro_key_is_gone(tmp_path):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["site"].update(intro="old text")))

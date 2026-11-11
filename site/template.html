@@ -6,37 +6,43 @@
 <meta http-equiv="Content-Security-Policy" content="{{csp}}">
 <meta name="referrer" content="no-referrer">
 <title>{{title}}</title>
+<script src="src/theme-init.js"></script>
 <link rel="stylesheet" href="src/style.css">
 </head>
-<body>
+<body class="chat" data-state="welcome">
+<header class="bar">
+  <span class="brand">{{brand}}</span>
+  <nav class="links links-top">{{links}}</nav>
+  <button id="theme" type="button" class="btn icon" aria-label="Switch light or dark mode">◐</button>
+</header>
+
 <main>
-  <header>
-    <h1>{{title}}</h1>
-    <p class="intro">{{intro}}</p>
-  </header>
+  <section class="hero">
+    <h1 class="greeting">{{greeting}}</h1>
+    <p class="tagline">{{tagline}}</p>
+    <nav class="links links-hero">{{links}}</nav>
+    <div class="starters">
+{{starters}}
+    </div>
+  </section>
 
   <p id="invite-missing" class="notice" hidden>
     You need an invite link to ask questions here. Open the link you were sent; it contains your
     access code. If you lost it, ask the person who sent it for a new one.
   </p>
 
-  <section id="ask-section" aria-labelledby="try-heading">
-    <h2 id="try-heading">Try a question</h2>
-    <div class="starters">
-{{starters}}
-    </div>
-    <form id="ask-form" autocomplete="off">
-      <label for="question">Your question</label>
-      <textarea id="question" rows="3" placeholder="Ask anything about using VisiData"></textarea>
-      <div class="row">
-        <span id="counter" aria-live="off">0/500</span>
-        <button id="ask" type="submit" disabled>Ask</button>
-      </div>
-    </form>
-    <p id="banner" role="status" aria-live="polite" hidden></p>
-  </section>
+  <section id="answers" role="log" aria-label="Conversation"></section>
 
-  <section id="answers" aria-label="Answers"></section>
+  <div class="dock">
+    <p id="banner" role="status" aria-live="polite" hidden></p>
+    <form id="ask-form" autocomplete="off">
+      <label for="question" class="visually-hidden">Your question</label>
+      <textarea id="question" rows="1" placeholder="Ask anything about using VisiData"></textarea>
+      <span id="counter" aria-live="off">0/500</span>
+      <button id="ask" type="submit" aria-label="Send" disabled>↑</button>
+    </form>
+    <p class="dock-note">Answers only from the VisiData docs · can make mistakes</p>
+  </div>
 
   <p class="evals-link"><a href="evals.html">How well does this work? See the test results.</a></p>
 </main>

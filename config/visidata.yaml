@@ -48,10 +48,12 @@ site:
   url: https://navyyshukla.github.io/citeable-docs/
   api_base_url: https://citeable-docs-api.onrender.com
   title: Ask the VisiData docs
-  intro: >-
-    VisiData is a free tool that runs in the terminal and works like a spreadsheet for data
-    files such as CSV. You drive it with the keyboard and can explore a file quickly. Ask
-    anything about using it; answers come only from its documentation, with links.
+  brand: Ask VisiData
+  greeting: Hi, ask me about VisiData
+  tagline: >-
+    VisiData is a free keyboard tool for exploring data files like spreadsheets. Every answer
+    comes from its docs, with links.
+  about_url: https://www.visidata.org
   starter_questions:
     - How do I rename a column?
     - How can I convert a CSV file to another file type?

@@ -1,8 +1,9 @@
+import re
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class _Strict(BaseModel):
@@ -69,11 +70,23 @@ class SiteCfg(_Strict):
     url: str  # where the page is served; the invite link is built from it
     api_base_url: str
     title: str
-    intro: str  # for visitors who have never used the project
+    brand: str = Field(min_length=1)  # short name shown in the top bar
+    greeting: str = Field(min_length=1)  # big line on the welcome screen
+    tagline: str = Field(min_length=1)  # one plain sentence for visitors who have never used it
+    about_url: str  # "What is ...?" link
+    intro_video_url: str | None = None  # optional; the link is left out when unset
     starter_questions: list[str] = Field(min_length=1, max_length=6)
     privacy_notice: str
     # eval question id -> a note shown on /evals for answers that are wrong because of the docs
     known_wrong: dict[str, str] = {}
+
+    @field_validator("about_url", "intro_video_url")
+    @classmethod
+    def _safe_https_url(cls, v):
+        # These go into href attributes: https only, and no character that could break out.
+        if v is not None and not (v.startswith("https://") and not re.search(r"[\s\"'<>`\\]", v)):
+            raise ValueError("must be an https:// URL without spaces or quote/angle characters")
+        return v
 
 
 class Config(_Strict):
