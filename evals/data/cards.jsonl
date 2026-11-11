@@ -1,0 +1,43 @@
+{"id": "a-001", "question": "what is visidata", "label": "about"}
+{"id": "a-002", "question": "so what is visidata exactly", "label": "about"}
+{"id": "a-003", "question": "what does visidata do", "label": "about"}
+{"id": "a-004", "question": "how do I get started with visidata", "label": "about"}
+{"id": "a-005", "question": "how do I use visidata", "label": "about"}
+{"id": "a-006", "question": "tell me about visidata", "label": "about"}
+{"id": "a-007", "question": "explain visidata to me", "label": "about"}
+{"id": "a-008", "question": "what is visidata used for", "label": "about"}
+{"id": "a-009", "question": "is visidata a spreadsheet", "label": "about"}
+{"id": "a-010", "question": "where do I begin with visidata", "label": "about"}
+{"id": "a-011", "question": "give me an intro to visidata", "label": "about"}
+{"id": "a-012", "question": "what is visidata and who is it for", "label": "about"}
+{"id": "h-001", "question": "what can you do", "label": "help"}
+{"id": "h-002", "question": "what can you help me with", "label": "help"}
+{"id": "h-003", "question": "how do I use you", "label": "help"}
+{"id": "h-004", "question": "what are you", "label": "help"}
+{"id": "h-005", "question": "who are you", "label": "help"}
+{"id": "h-006", "question": "help", "label": "help"}
+{"id": "h-007", "question": "what are you for", "label": "help"}
+{"id": "h-008", "question": "how does this chatbot work", "label": "help"}
+{"id": "h-009", "question": "what kind of questions can I ask", "label": "help"}
+{"id": "h-010", "question": "can you help me", "label": "help"}
+{"id": "h-011", "question": "what are your limits", "label": "help"}
+{"id": "h-012", "question": "do you remember what I asked before", "label": "help"}
+{"id": "n-001", "question": "how do I rename a column", "label": "normal"}
+{"id": "n-002", "question": "how do I sort rows by a column", "label": "normal"}
+{"id": "n-003", "question": "what does the ! key do to a column", "label": "normal"}
+{"id": "n-004", "question": "how do I open a CSV file", "label": "normal"}
+{"id": "n-005", "question": "how do I save the sheet as json", "label": "normal"}
+{"id": "n-006", "question": "how do I join two sheets", "label": "normal"}
+{"id": "n-007", "question": "how do I undo my last change", "label": "normal"}
+{"id": "n-008", "question": "what does Ctrl+S do in visidata", "label": "normal"}
+{"id": "n-009", "question": "how do I filter rows that contain a word", "label": "normal"}
+{"id": "n-010", "question": "how do I make a pivot table", "label": "normal"}
+{"id": "n-011", "question": "what is a derived column", "label": "normal"}
+{"id": "n-012", "question": "what is the difference between a sheet and a column", "label": "normal"}
+{"id": "n-013", "question": "what is a frequency table", "label": "normal"}
+{"id": "n-014", "question": "how do I use the join command", "label": "normal"}
+{"id": "n-015", "question": "what does the help key do", "label": "normal"}
+{"id": "n-016", "question": "how do I use visidata to sort a column", "label": "normal"}
+{"id": "n-017", "question": "what can I do with a frequency table", "label": "normal"}
+{"id": "n-018", "question": "what is the weather today", "label": "normal"}
+{"id": "n-019", "question": "write me a poem about spreadsheets", "label": "normal"}
