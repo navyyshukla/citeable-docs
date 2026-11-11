@@ -1,9 +1,11 @@
 // Page wiring. The logic that can be tested without a browser lives in token.js, api.js,
-// view.js and render.js. Server text is always put in with textContent; the only innerHTML is the
-// output of the safe renderer (render.js).
+// view.js, input.js, theme.js and render.js; cards.js builds the conversation pieces. Server text is always put in with textContent (see cards.js).
 import { createApi } from "./api.js";
 import { loadToken, saveToken, forgetToken } from "./token.js";
-import { resultView, questionState, createBannerState } from "./view.js";
+import { questionState, createBannerState, pageState } from "./view.js";
+import { buildUserBubble, buildAnswerCard } from "./cards.js";
+import { enterAction, growHeight, scrollBehavior, isTouchDevice } from "./input.js";
+import { readTheme, saveTheme, effectiveTheme, nextTheme } from "./theme.js";
 
 const $ = (id) => document.getElementById(id);
 const config = JSON.parse($("page-config").textContent);
@@ -25,6 +27,7 @@ const counter = $("counter");
 const banner = $("banner");
 let token = null;
 let busy = false;
+let started = false; // true once the first answer card is on the page
 const bannerState = createBannerState();
 
 function renderBanner() {
@@ -50,87 +53,35 @@ function updateControls() {
   askButton.disabled = busy || !token || !st.canAsk;
 }
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
+function setState() {
+  document.body.dataset.state = pageState({ hasToken: !!token, started });
 }
 
-function link(url, text) {
-  const a = el("a", null, text);
-  a.href = url; // view.js has already kept only plain https URLs
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  return a;
+const darkQuery = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+const themeButton = $("theme");
+function paintThemeButton() {
+  const dark = effectiveTheme(readTheme(storage), darkQuery()) === "dark";
+  themeButton.textContent = dark ? "☀️" : "🌙";
+  themeButton.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
 }
 
-function feedbackBlock(requestId) {
-  const wrap = el("div", "feedback");
-  wrap.append(el("span", null, "Was this helpful?"));
-  const yes = el("button", null, "Yes, helpful");
-  const no = el("button", null, "No");
-  const comment = el("textarea");
-  comment.rows = 2;
-  comment.placeholder = "What was wrong? (optional)";
-  comment.hidden = true;
-  const send = el("button", null, "Send");
-  send.hidden = true;
-  const note = el("span", "thanks");
-  yes.type = no.type = send.type = "button";
-
-  async function submit(rating, text) {
-    yes.disabled = no.disabled = send.disabled = true;
-    try {
-      await api.feedback(token, requestId, rating, text);
-      wrap.replaceChildren(el("span", "thanks", "Thanks, your feedback was saved."));
-    } catch (err) {
-      note.textContent = err.message;
-      yes.disabled = no.disabled = send.disabled = false;
-    }
-  }
-  yes.addEventListener("click", () => submit(1));
-  no.addEventListener("click", () => {
-    comment.hidden = send.hidden = false;
-    no.disabled = true;
-    comment.focus();
-  });
-  send.addEventListener("click", () => submit(-1, comment.value.trim() || undefined));
-  wrap.append(yes, no, comment, send, note);
-  return wrap;
+// The box grows with the text up to about 8 lines, then scrolls.
+const BOX_MIN = 24;
+const BOX_MAX = 192;
+function resizeBox() {
+  box.style.height = "auto";
+  const h = growHeight(box.scrollHeight, BOX_MIN, BOX_MAX);
+  box.style.height = `${h}px`;
+  box.style.overflowY = box.scrollHeight > BOX_MAX ? "auto" : "hidden";
 }
 
-function addCard(question, result) {
-  const v = resultView(result);
-  const kind = result && (result.status === "answered" || result.status === "abstained")
-    ? result.status : "unknown";
-  const card = el("article", "card");
-  card.append(el("p", "q", `You asked: ${question}`), el("span", `status ${kind}`, v.label));
-  const body = el("div", "body");
-  body.innerHTML = v.bodyHtml; // output of the safe renderer only
-  card.append(body);
-  if (v.sources.length) {
-    card.append(el("p", "thanks", "Sources in the docs:"));
-    const ul = el("ul", "sources");
-    for (const s of v.sources) {
-      const li = el("li");
-      li.append(link(s.url, `[${s.n}] ${s.title}`));
-      ul.append(li);
-    }
-    card.append(ul);
-  }
-  if (v.closest.length) {
-    card.append(el("p", "thanks", "Closest pages in the docs:"));
-    const ul = el("ul", "sources");
-    for (const s of v.closest) {
-      const li = el("li");
-      li.append(link(s.url, s.title));
-      ul.append(li);
-    }
-    card.append(ul);
-  }
-  if (v.showFeedback && result.request_id) card.append(feedbackBlock(result.request_id));
-  $("answers").prepend(card);
+function addExchange(question, result) {
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const card = buildAnswerCard(result, { api, getToken: () => token });
+  $("answers").append(buildUserBubble(question), card);
+  started = true;
+  setState();
+  card.scrollIntoView({ behavior: scrollBehavior(reduced), block: "start" });
   if (result && result.docs_version) {
     const date = result.last_updated ? `, last updated ${result.last_updated}` : "";
     $("docs-info").textContent = `Docs version ${result.docs_version}${date}.`;
@@ -147,8 +98,9 @@ async function ask() {
     "Looking through the docs… the server may be waking up, which can take up to 30 seconds."), 3000);
   try {
     const result = await api.ask(token, question);
-    addCard(question, result);
+    addExchange(question, result);
     box.value = "";
+    resizeBox();
     hideBanner();
   } catch (err) {
     showBanner(err.message, "error"); // the question stays in the box so nothing is lost
@@ -163,7 +115,7 @@ function showNoInvite(message) {
   const notice = $("invite-missing");
   if (message) notice.textContent = message;
   notice.hidden = false;
-  $("ask-section").hidden = true;
+  setState();
 }
 
 function wakeCheck() {
@@ -194,10 +146,24 @@ if (!token) {
 } else {
   wakeCheck();
 }
+setState();
+paintThemeButton();
 
-box.addEventListener("input", updateControls);
+box.addEventListener("input", () => {
+  updateControls();
+  resizeBox();
+});
 box.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("ask-form").requestSubmit();
+  if (enterAction(e, isTouchDevice(window.matchMedia)) === "send") {
+    e.preventDefault();
+    $("ask-form").requestSubmit();
+  }
+});
+themeButton.addEventListener("click", () => {
+  const next = nextTheme(readTheme(storage), darkQuery());
+  document.documentElement.dataset.theme = next;
+  saveTheme(storage, next);
+  paintThemeButton();
 });
 $("ask-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -208,12 +174,14 @@ document.querySelector(".starters").addEventListener("click", (e) => {
   if (!q) return;
   box.value = q.dataset.question; // fills the box only: the visitor decides when to send
   updateControls();
+  resizeBox();
   box.focus();
 });
 $("forget").addEventListener("click", (e) => {
   e.preventDefault();
   forgetToken(storage);
   token = null;
+  started = false;
   history.replaceState(null, "", location.pathname + location.search);
   $("answers").replaceChildren();
   hideBanner();
