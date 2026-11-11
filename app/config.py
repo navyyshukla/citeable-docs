@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _Strict(BaseModel):
@@ -47,6 +47,9 @@ class LimitsCfg(_Strict):
     classifier_max_tokens: int = 64
     # Longest wait for the classifier, per provider; a slower one counts as a failure (= normal).
     classifier_timeout_seconds: float = 5.0
+    # The short model reply to questions about the assistant itself (see site.cards.help.facts).
+    help_max_tokens: int = Field(200, gt=0)
+    help_timeout_seconds: float = Field(20.0, gt=0)
     # Cloudflare's free allowance is 10,000 neurons/day; leave room for evals and the fallback.
     global_daily_neurons: float = 8000
     retention_days: int = 30
@@ -76,18 +79,26 @@ class CardCfg(_Strict):
     paragraphs: list[str] = Field(min_length=1, max_length=4)
     links: bool = False  # show the start-here links (website, intro video, Getting Started)
     examples: bool = False  # show the first starter questions as clickable examples
+    # Facts a model may use to answer questions about the assistant itself (the help card).
+    facts: list[str] = Field(default_factory=list, max_length=10)
 
-    @field_validator("paragraphs")
+    @field_validator("paragraphs", "facts")
     @classmethod
-    def _paragraphs_not_blank(cls, v):
+    def _no_blank_text(cls, v):
         if any(not p.strip() for p in v):
-            raise ValueError("a card paragraph must not be blank")
+            raise ValueError("card text must not be blank")
         return v
 
 
 class CardsCfg(_Strict):
     about: CardCfg
     help: CardCfg
+
+    @model_validator(mode="after")
+    def _help_needs_facts(self):
+        if not self.help.facts:
+            raise ValueError("the help card needs a fact sheet (facts)")
+        return self
 
 
 class SiteCfg(_Strict):

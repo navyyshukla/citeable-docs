@@ -189,3 +189,31 @@ def test_shipped_cards_and_classifier_limit():
     assert cfg.site.cards.about.description and cfg.site.cards.help.description
     assert cfg.limits.classifier_max_tokens == 64  # Groq reasoning tokens count inside it
     assert cfg.limits.classifier_timeout_seconds == 5.0
+
+
+def test_help_needs_a_fact_sheet(tmp_path):
+    from pydantic import ValidationError
+
+    for facts in ([], ["ok", "  "], [f"fact {i}" for i in range(11)]):
+        with pytest.raises(ValidationError):
+            load_config(_variant(tmp_path, lambda d: d["site"]["cards"]["help"].update(facts=facts)))
+
+
+def test_about_may_have_no_facts(tmp_path):
+    cfg = load_config(_variant(tmp_path, lambda d: d["site"]["cards"]["about"].pop("facts", None)))
+    assert cfg.site.cards.about.facts == []
+
+
+def test_shipped_help_facts_and_limits():
+    cfg = load_config(CONFIG)
+    assert len(cfg.site.cards.help.facts) == 5
+    assert cfg.limits.help_max_tokens == 200 and cfg.limits.help_timeout_seconds == 20.0
+
+
+@pytest.mark.parametrize("key,bad", [("help_max_tokens", 0), ("help_timeout_seconds", 0),
+                                     ("help_timeout_seconds", -1)])
+def test_help_limits_must_be_positive(tmp_path, key, bad):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["limits"].update({key: bad})))

@@ -24,6 +24,8 @@ limits:
   per_visitor_daily_cap: 10
   classifier_max_tokens: 64
   classifier_timeout_seconds: 5.0
+  help_max_tokens: 200
+  help_timeout_seconds: 20.0
   global_daily_neurons: 8000
   retention_days: 30
 models:
@@ -83,6 +85,12 @@ site:
           I can't answer anything outside VisiData, and I can make mistakes: check the linked
           page.
       examples: true
+      facts:
+        - I am an unofficial assistant that answers how-to questions about VisiData, a free terminal tool for exploring data files like spreadsheets.
+        - I answer using only VisiData's documentation, and I show the pages I used.
+        - I look at each question on its own, so I do not remember earlier questions; ask each one in full.
+        - I can only help with VisiData, because the VisiData documentation is all I have; I cannot answer other topics, run VisiData or open your files.
+        - I can make mistakes, so check the linked page.
   privacy_notice: >-
     Your question and the answer are kept for 30 days, then deleted. Only the owner reads
     questions. To answer, the text of your question is sent to Cloudflare and Groq (the AI
