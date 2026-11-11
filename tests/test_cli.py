@@ -441,7 +441,7 @@ def test_eval_parser_accepts_pause(monkeypatch, tmp_path):
     captured = {}
 
     def fake_run_answers(*a, **k):
-        captured["pause"] = k.get("pause")
+        captured["pause"] = a[-1]  # run_answers(..., max_neurons, pause)
         raise _Stop
 
     store = FakeStore(stored=1)
