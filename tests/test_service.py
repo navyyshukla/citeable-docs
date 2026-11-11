@@ -78,7 +78,7 @@ class Fake:
         self.text, self.label = text, label
         self.calls = self.answer_calls = 0
 
-    def complete(self, system, user, max_tokens):
+    def complete(self, system, user, max_tokens, timeout=None):
         self.calls += 1
         if "exactly one word" in system:
             return Completion(self.label, "fake", "m", 50, 2, 2.5, 0.1)
@@ -89,11 +89,11 @@ class Fake:
 class FlakyFirst(Fake):
     """The first call (the classifier) fails; later calls work."""
 
-    def complete(self, system, user, max_tokens):
+    def complete(self, system, user, max_tokens, timeout=None):
         if self.calls == 0:
             self.calls += 1
             raise ProviderError("503", 503)
-        return super().complete(system, user, max_tokens)
+        return super().complete(system, user, max_tokens, timeout)
 
 
 class Down:

@@ -52,3 +52,19 @@ def test_neurons_of_failed_attempts_count_even_when_every_provider_fails():
     with pytest.raises(AllProvidersFailed):
         a.complete("s", "u", 50)
     assert a.total_neurons == 27.0
+
+
+def test_timeout_is_forwarded_only_when_given():
+    seen = []
+
+    class Recorder:
+        name = "rec"
+
+        def complete(self, *args, **kwargs):
+            seen.append((args, kwargs))
+            return Completion("x", "rec", "m", 1, 1, 0.0, 0.01)
+
+    a = Adapter([Recorder()])
+    a.complete("s", "u", 16)  # old three-argument call: providers see exactly that
+    a.complete("s", "u", 16, timeout=5.0)
+    assert seen[0] == (("s", "u", 16), {}) and seen[1] == (("s", "u", 16, 5.0), {})

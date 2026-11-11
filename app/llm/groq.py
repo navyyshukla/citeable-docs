@@ -16,8 +16,10 @@ class GroqProvider:
         self.api_key, self.model, self.reasoning_effort = api_key, model, reasoning_effort
         self.client = client or httpx.Client(timeout=60)
 
-    def complete(self, system: str, user: str, max_tokens: int) -> Completion:
+    def complete(self, system: str, user: str, max_tokens: int,
+                 timeout: float | None = None) -> Completion:
         t0 = time.monotonic()
+        extra = {} if timeout is None else {"timeout": timeout}  # None would mean "no limit"
         try:
             r = self.client.post(URL, headers={"Authorization": f"Bearer {self.api_key}"}, json={
                 "model": self.model,
@@ -25,7 +27,7 @@ class GroqProvider:
                              {"role": "user", "content": user}],
                 "max_completion_tokens": max_tokens,
                 "reasoning_effort": self.reasoning_effort,
-            })
+            }, **extra)
         except httpx.HTTPError as e:
             raise ProviderError(f"network error: {type(e).__name__}") from e
         if r.status_code != 200:

@@ -11,10 +11,11 @@ class Say:
     name = "say"
 
     def __init__(self, text):
-        self.text, self.max_tokens_seen = text, []
+        self.text, self.max_tokens_seen, self.timeouts_seen = text, [], []
 
-    def complete(self, system, user, max_tokens):
+    def complete(self, system, user, max_tokens, timeout=None):
         self.max_tokens_seen.append(max_tokens)
+        self.timeouts_seen.append(timeout)
         return Completion(self.text, "say", "m", 50, 2, 1.0, 0.1)
 
 
@@ -79,3 +80,21 @@ def test_classify_uses_the_configured_token_limit():
     p = Say("normal")
     classify_question("q", Adapter([p]), CFG)
     assert p.max_tokens_seen == [CFG.limits.classifier_max_tokens]
+
+
+def test_classify_passes_the_configured_timeout():
+    p = Say("normal")
+    classify_question("q", Adapter([p]), CFG)
+    assert p.timeouts_seen == [CFG.limits.classifier_timeout_seconds]
+    assert CFG.limits.classifier_timeout_seconds == 5.0
+
+
+def test_a_timed_out_provider_falls_through_to_the_next_then_to_normal():
+    class Slow:
+        name = "slow"
+
+        def complete(self, *a):
+            raise ProviderError("network error: ReadTimeout")
+
+    assert classify_question("q", Adapter([Slow(), Say("help")]), CFG) == "help"
+    assert classify_question("q", Adapter([Slow(), Slow()]), CFG) == "normal"

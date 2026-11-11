@@ -56,3 +56,17 @@ def test_malformed_body_fails():
         provider(lambda r: httpx.Response(200, content=b"nope")).complete("s", "u", 5)
     with pytest.raises(ProviderError):
         provider(lambda r: httpx.Response(200, json={"choices": []})).complete("s", "u", 5)
+
+
+def test_timeout_is_set_per_request_only_when_given():
+    seen = []
+
+    def handler(req):
+        seen.append(req.extensions["timeout"]["read"])
+        return httpx.Response(200, json=OK)
+
+    p = GroqProvider("gk", "openai/gpt-oss-20b",
+                     httpx.Client(transport=httpx.MockTransport(handler), timeout=60))
+    p.complete("sys", "user", 16, timeout=5.0)
+    p.complete("sys", "user", 16)
+    assert seen == [5.0, 60]

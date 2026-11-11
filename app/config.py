@@ -45,6 +45,8 @@ class LimitsCfg(_Strict):
     per_visitor_daily_cap: int = 10
     # Reply budget for the one-word question classifier (it must stop on its own inside this).
     classifier_max_tokens: int = 16
+    # Longest wait for the classifier, per provider; a slower one counts as a failure (= normal).
+    classifier_timeout_seconds: float = 5.0
     # Cloudflare's free allowance is 10,000 neurons/day; leave room for evals and the fallback.
     global_daily_neurons: float = 8000
     retention_days: int = 30

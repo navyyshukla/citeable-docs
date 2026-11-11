@@ -14,11 +14,13 @@ class CloudflareClient:
         self.account_id, self.api_token = account_id, api_token
         self.client = client or httpx.Client(timeout=60)
 
-    def run(self, model: str, payload: dict) -> dict:
+    def run(self, model: str, payload: dict, timeout: float | None = None) -> dict:
         url = f"https://api.cloudflare.com/client/v4/accounts/{self.account_id}/ai/run/{model}"
         try:
+            # timeout=None would mean "no limit" to httpx, so it is passed only when given.
+            extra = {} if timeout is None else {"timeout": timeout}
             r = self.client.post(url, headers={"Authorization": f"Bearer {self.api_token}"},
-                                 json=payload)
+                                 json=payload, **extra)
         except httpx.HTTPError as e:
             raise ProviderError(f"network error: {type(e).__name__}") from e
         if r.status_code != 200:
@@ -54,7 +56,8 @@ class CloudflareProvider:
         self.cf, self.model, self.price = cf, model, price
         self.thinking, self.max_tokens_cap = thinking, max_tokens_cap
 
-    def complete(self, system: str, user: str, max_tokens: int) -> Completion:
+    def complete(self, system: str, user: str, max_tokens: int,
+                 timeout: float | None = None) -> Completion:
         t0 = time.monotonic()
         if self.max_tokens_cap is not None:
             max_tokens = min(max_tokens, self.max_tokens_cap)
@@ -65,7 +68,7 @@ class CloudflareProvider:
         }
         if self.thinking is not None:
             payload["chat_template_kwargs"] = {"enable_thinking": self.thinking}
-        result = self.cf.run(self.model, payload)
+        result = self.cf.run(self.model, payload, timeout)
         usage = result.get("usage") or {}
         tin, tout = usage.get("prompt_tokens"), usage.get("completion_tokens")
         neurons = usage.get("neurons")

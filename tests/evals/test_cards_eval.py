@@ -71,7 +71,7 @@ class Say:
     def __init__(self, text):
         self.text = text
 
-    def complete(self, system, user, max_tokens):
+    def complete(self, system, user, max_tokens, timeout=None):
         return Completion(self.text, "say", "m", 10, 1, 2.0, 0.1)
 
 

@@ -39,7 +39,8 @@ def classify_question(question: str, adapter: Adapter, cfg: Config) -> str:
     """Never raises. Returns one of LABELS."""
     system, user = build_prompts(question, cfg)
     try:
-        c = adapter.complete(system, user, cfg.limits.classifier_max_tokens)
+        c = adapter.complete(system, user, cfg.limits.classifier_max_tokens,
+                             cfg.limits.classifier_timeout_seconds)
     except (ProviderError, AllProvidersFailed):
         return "normal"
     return parse_label(c.text)

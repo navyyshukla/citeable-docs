@@ -159,3 +159,17 @@ def test_a_cut_off_reply_still_reports_the_neurons_it_burned():
     with pytest.raises(ProviderError) as e:
         p.complete("s", "u", 50)
     assert e.value.neurons == 27.0
+
+
+def test_timeout_is_set_per_request_only_when_given():
+    seen = []
+
+    def handler(req):
+        seen.append(req.extensions["timeout"]["read"])
+        return httpx.Response(200, json=CHAT_OK)
+
+    http = httpx.Client(transport=httpx.MockTransport(handler), timeout=60)
+    p = CloudflareProvider(CloudflareClient("acct", "tok", http), "@cf/meta/m")
+    p.complete("sys", "user", 16, timeout=5.0)
+    p.complete("sys", "user", 16)
+    assert seen == [5.0, 60]  # no timeout argument: the client's own default, never "no timeout"

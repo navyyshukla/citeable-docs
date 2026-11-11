@@ -27,7 +27,8 @@ class Completion:
 class Provider(Protocol):
     name: str
 
-    def complete(self, system: str, user: str, max_tokens: int) -> Completion: ...
+    def complete(self, system: str, user: str, max_tokens: int,
+                 timeout: float | None = None) -> Completion: ...
 
 
 def check_answer(text: object, finish_reason: object) -> str:
@@ -47,14 +48,17 @@ class Adapter:
         self.calls_made = 0
         self.total_neurons = 0.0
 
-    def complete(self, system: str, user: str, max_tokens: int) -> Completion:
+    def complete(self, system: str, user: str, max_tokens: int,
+                 timeout: float | None = None) -> Completion:
+        """`timeout` (seconds) limits each provider attempt; None keeps the client's own default."""
         if not self.providers:
             raise AllProvidersFailed("no providers configured")
         errors: list[str] = []
         for p in self.providers:
             self.calls_made += 1
             try:
-                c = p.complete(system, user, max_tokens)
+                c = (p.complete(system, user, max_tokens) if timeout is None
+                     else p.complete(system, user, max_tokens, timeout))
             except ProviderError as e:
                 self.total_neurons += e.neurons or 0.0
                 label = f"{p.name}:{getattr(p, 'model', '?')}"
