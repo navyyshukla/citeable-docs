@@ -22,8 +22,8 @@ from evals.runner import (RetrievalRow, run_answers, run_retrieval, summarize_an
                           write_results)
 from evals.judge import (JudgeVerdict, agreement, items_from_results, judge_answer,
                          load_labels)
-from evals.generate import (build_unanswerable_prompt, generate, parse_unanswerable,
-                            write_check_sheet)
+from evals.generate import (build_unanswerable_prompt, choose_pieces, generate,
+                            parse_unanswerable, used_pairs, write_check_sheet)
 from evals.schema import load_questions
 from evals.threshold import threshold_table
 from ingest.fetch import fetch_docs_and_commit
@@ -241,16 +241,21 @@ def cmd_generate_questions(args) -> int:
     if out.exists():
         print(f"{out} already exists: move it or choose another --out", file=sys.stderr)
         return 1
-    pieces = sorted((p for p in _store(cfg).load_pieces(cfg.project.slug)
-                     if len(p.text) >= MIN_PIECE_CHARS_FOR_QUESTIONS), key=lambda p: p.id)
+    try:
+        taken = used_pairs(args.exclude_from or [])
+    except (OSError, ValueError) as e:
+        print(f"--exclude-from: {e}", file=sys.stderr)
+        return 1
+    pieces = [p for p in _store(cfg).load_pieces(cfg.project.slug)
+              if len(p.text) >= MIN_PIECE_CHARS_FOR_QUESTIONS]
     if not pieces:
         print("no pieces long enough to write questions from; run ingest first", file=sys.stderr)
         return 1
-    step = max(1, len(pieces) // max(1, args.limit))  # spread over the whole docs
-    chosen = pieces[::step][:args.limit]
+    chosen = choose_pieces(pieces, args.limit, taken)  # spread over the docs, skipping used ones
     existing = {q.question.lower() for q in load_questions(Path(args.data))}
     provider = GeminiProvider(os.environ["GEMINI_API_KEY"], json_output=True)
-    questions = generate(chosen, provider, limit=args.limit, existing=existing)
+    questions = generate(chosen, provider, limit=args.limit, existing=existing,
+                         prefix=args.id_prefix, split=args.split)
     if args.unanswerable:
         titles = sorted({p.page_title for p in pieces})
         system, user = build_unanswerable_prompt(titles, args.unanswerable)
@@ -335,6 +340,10 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--limit", type=int, default=25)
     q.add_argument("--unanswerable", type=int, default=5)
     q.add_argument("--sheet")
+    q.add_argument("--exclude-from", nargs="*", default=[],
+                   help="question files whose pieces must not be used again")
+    q.add_argument("--id-prefix", default="s", help="ids look like <prefix>-001")
+    q.add_argument("--split", default="dev", choices=["dev", "heldout"])
     q.add_argument("--data", default="evals/data/dev.jsonl")
     q.add_argument("--config", default=argparse.SUPPRESS)
     g = sub.add_parser("judge-agreement")

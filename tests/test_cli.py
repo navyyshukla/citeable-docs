@@ -460,3 +460,46 @@ def test_eval_parser_accepts_pause(monkeypatch, tmp_path):
         main(["eval", "--answer", "--modes", "hybrid", "--pause", "7", "--data", str(q),
               "--out", str(tmp_path / "r.json")])
     assert captured["pause"] == 7.0
+
+
+def test_generate_questions_heldout_skips_earlier_pieces_and_uses_its_own_ids(
+        monkeypatch, tmp_path):
+    import json as _json
+
+    from app.llm.base import Completion
+    from evals.schema import load_questions
+    from ingest.models import Piece
+
+    def mk(i):
+        return Piece(id=f"pg{i}:0", page_slug=f"pg{i}", page_title=f"Page {i}", url="https://x/",
+                     anchor="a", heading_path=(f"Page {i}", "H"), text="body text " * 40,
+                     docs_ref="stable@abc", docs_version="3", last_updated="2026-01-01")
+
+    class FakeStore:
+        def load_pieces(self, project):
+            return [mk(i) for i in range(6)]
+
+    class FakeGemini:
+        def __init__(self, key, **kw):
+            pass
+
+        def complete(self, system, user, max_tokens):
+            return Completion(_json.dumps({"questions": [f"held {user[:12]} {id(self)} a?"]}),
+                              "gemini", "m", 1, 1, None, 0.1)
+
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli._store", lambda cfg: FakeStore())
+    monkeypatch.setattr("app.cli.GeminiProvider", FakeGemini)
+    monkeypatch.setattr("evals.generate.time.sleep", lambda s: None)
+    earlier = tmp_path / "earlier.jsonl"
+    earlier.write_text(
+        '{"id":"x","question":"old?","answerable":true,"gold_page":"pg0","gold_heading":"H",'
+        '"source":"synthetic","split":"dev"}\n', encoding="utf-8")
+    out = tmp_path / "held.jsonl"
+    assert main(["generate-questions", "--out", str(out), "--limit", "5", "--unanswerable", "0",
+                 "--exclude-from", str(earlier), "--id-prefix", "h", "--split", "heldout"]) == 0
+    qs = load_questions(out)
+    assert qs and all(q.id.startswith("h-") and q.split == "heldout" for q in qs)
+    assert "pg0" not in {q.gold_page for q in qs}
+    assert main(["generate-questions", "--out", str(tmp_path / "b.jsonl"), "--exclude-from",
+                 str(tmp_path / "missing.jsonl")]) == 1

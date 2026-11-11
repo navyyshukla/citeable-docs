@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.llm.base import Completion, ProviderError
-from evals.schema import EvalQuestion
+from evals.schema import EvalQuestion, load_questions
 from ingest.models import Piece
 
 MAX_QUESTION_CHARS = 500  # the same limit the API enforces
@@ -72,12 +72,12 @@ def _clean(text: str, existing: set[str]) -> list[str]:
     return out
 
 
-def parse_questions(text: str, piece: Piece, next_id: int, existing: set[str]
-                    ) -> list[EvalQuestion]:
+def parse_questions(text: str, piece: Piece, next_id: int, existing: set[str], *,
+                    prefix: str = "s", split: str = "dev") -> list[EvalQuestion]:
     """`existing` holds lower-cased questions already taken; it is extended in place."""
-    return [EvalQuestion(id=f"s-{next_id + i:03d}", question=q, answerable=True,
+    return [EvalQuestion(id=f"{prefix}-{next_id + i:03d}", question=q, answerable=True,
                          gold_page=piece.page_slug, gold_heading=piece.heading_path[-1],
-                         source="synthetic", split="dev")
+                         source="synthetic", split=split)
             for i, q in enumerate(_clean(text, existing))]
 
 
@@ -87,8 +87,27 @@ def parse_unanswerable(text: str, next_id: int, existing: set[str]) -> list[Eval
             for i, q in enumerate(_clean(text, existing))]
 
 
+def used_pairs(paths) -> set[tuple[str, str]]:
+    """(page, heading) of every answerable question in the given files: pieces earlier sets used.
+    A missing file is an error, so a typo cannot silently let an old piece through."""
+    pairs: set[tuple[str, str]] = set()
+    for path in paths:
+        for q in load_questions(Path(path)):
+            if q.answerable and q.gold_page and q.gold_heading:
+                pairs.add((q.gold_page, q.gold_heading))
+    return pairs
+
+
+def choose_pieces(pieces: list[Piece], limit: int, taken: set[tuple[str, str]]) -> list[Piece]:
+    """Up to `limit` pieces spread over the whole docs, none in `taken`, in a stable order."""
+    free = sorted((p for p in pieces if (p.page_slug, p.heading_path[-1]) not in taken),
+                  key=lambda p: p.id)
+    step = max(1, len(free) // max(1, limit))
+    return free[::step][:limit]
+
+
 def generate(pieces: list[Piece], provider: _Provider, *, limit: int, pause: float = 6.0,
-             existing: set[str], start_id: int = 1,
+             existing: set[str], start_id: int = 1, prefix: str = "s", split: str = "dev",
              sleep: Callable[[float], None] | None = None) -> list[EvalQuestion]:
     """One provider call per piece, at most `limit` calls. A failed call is skipped.
     The pause keeps under the free tier's per-minute limit."""
@@ -103,7 +122,7 @@ def generate(pieces: list[Piece], provider: _Provider, *, limit: int, pause: flo
             c = provider.complete(system, user, 600)
         except ProviderError:
             continue
-        out += parse_questions(c.text, piece, start_id + len(out), seen)
+        out += parse_questions(c.text, piece, start_id + len(out), seen, prefix=prefix, split=split)
     return out
 
 

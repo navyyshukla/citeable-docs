@@ -121,3 +121,39 @@ def test_a_written_jsonl_loads_back_and_holds_no_piece_text(tmp_path):
     f.write_text("\n".join(q.model_dump_json() for q in qs) + "\n", encoding="utf-8")
     assert [q.id for q in load_questions(f)] == ["s-001", "s-002"]
     assert SECRET not in f.read_text(encoding="utf-8")
+
+
+def test_parse_questions_can_use_another_id_prefix_and_split():
+    qs = parse_questions(reply("one?", "two?"), piece(), 5, set(), prefix="h", split="heldout")
+    assert [q.id for q in qs] == ["h-005", "h-006"]
+    assert {q.split for q in qs} == {"heldout"} and {q.source for q in qs} == {"synthetic"}
+
+
+def test_used_pairs_reads_page_and_heading_from_question_files(tmp_path):
+    from evals.generate import used_pairs
+    f = tmp_path / "q.jsonl"
+    f.write_text(
+        '{"id":"a","question":"q?","answerable":true,"gold_page":"join","gold_heading":"How to join",'
+        '"also_gold_pages":["rows"],"source":"synthetic","split":"dev"}\n'
+        '{"id":"b","question":"r?","answerable":false,"source":"synthetic","split":"dev"}\n',
+        encoding="utf-8")
+    assert used_pairs([f]) == {("join", "How to join")}
+
+
+def test_used_pairs_missing_file_is_an_error(tmp_path):
+    import pytest
+    from evals.generate import used_pairs
+    with pytest.raises(FileNotFoundError):
+        used_pairs([tmp_path / "nope.jsonl"])
+
+
+def test_choose_pieces_never_picks_an_excluded_piece_and_spreads_out():
+    from evals.generate import choose_pieces
+    pieces = [piece(i, slug=f"pg{i}", heading="H") for i in range(20)]
+    taken = {("pg0", "H"), ("pg5", "H"), ("pg10", "H")}
+    chosen = choose_pieces(pieces, 5, taken)
+    assert len(chosen) == 5
+    assert not any((p.page_slug, p.heading_path[-1]) in taken for p in chosen)
+    assert len({p.page_slug for p in chosen}) == 5
+    assert chosen == sorted(chosen, key=lambda p: p.id)  # deterministic order
+    assert choose_pieces(pieces[:3], 10, {("pg0", "H")}) == pieces[1:3]  # fewer than the limit
