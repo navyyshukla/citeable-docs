@@ -80,7 +80,7 @@ The old `intro` key is gone.
 `description` (tells the classifier which questions belong to it), `paragraphs` (1 to 4, plain text),
 and two switches, `links` (show the start-here links) and `examples` (show the first three starter
 questions as clickable examples). Edit the text there; no code change is needed. `limits.classifier_max_tokens`
-(16) is the reply budget and `limits.classifier_timeout_seconds` (5) the longest wait for the one-word classifier call that runs on every question (applied to each connection phase separately, so a slow provider can take up to about 10 s, and a 3-provider chain up to about 30 s). The page
+(64: Groq counts its hidden reasoning inside it, so 16 cut every call off) is the reply budget and `limits.classifier_timeout_seconds` (5) the longest wait for the one-word classifier call that runs on every question (applied to each connection phase separately, so a slow provider can take up to about 10 s, and a 3-provider chain up to about 30 s). The page
 builds the cards from its own copy of this config, so a text change needs the page to be rebuilt
 (a push to `main` does it). The API sends only `status: "card"` and `kind`.
 Rollout: the API (Render) and the page (Pages) deploy separately from one push; for a minute or two

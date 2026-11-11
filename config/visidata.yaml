@@ -22,7 +22,7 @@ limits:
   max_completion_tokens_no_thinking: 1000
   global_daily_cap: 150
   per_visitor_daily_cap: 10
-  classifier_max_tokens: 16
+  classifier_max_tokens: 64
   classifier_timeout_seconds: 5.0
   global_daily_neurons: 8000
   retention_days: 30

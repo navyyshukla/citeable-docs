@@ -187,5 +187,5 @@ def test_shipped_cards_and_classifier_limit():
     assert cfg.site.cards.about.links is True and cfg.site.cards.about.examples is False
     assert cfg.site.cards.help.examples is True and cfg.site.cards.help.links is False
     assert cfg.site.cards.about.description and cfg.site.cards.help.description
-    assert cfg.limits.classifier_max_tokens == 16
+    assert cfg.limits.classifier_max_tokens == 64  # Groq reasoning tokens count inside it
     assert cfg.limits.classifier_timeout_seconds == 5.0
