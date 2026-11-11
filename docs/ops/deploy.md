@@ -74,6 +74,21 @@ VisiData? Start here"). Every URL here must start with `https://` and contain no
 (the build refuses anything else). The welcome screen shows the first three `starter_questions`.
 The old `intro` key is gone.
 
+### About and Help cards, and the question classifier
+
+`site.cards.about` and `site.cards.help` in `config/visidata.yaml` hold the two fixed cards: `label`,
+`description` (tells the classifier which questions belong to it), `paragraphs` (1 to 4, plain text),
+and two switches, `links` (show the start-here links) and `examples` (show the first three starter
+questions as clickable examples). Edit the text there; no code change is needed. `limits.classifier_max_tokens`
+(16) is the reply budget of the one-word classifier call that runs on every question. The page
+builds the cards from its own copy of this config, so a text change needs the page to be rebuilt
+(a push to `main` does it). The API sends only `status: "card"` and `kind`.
+Rollout: the API (Render) and the page (Pages) deploy separately from one push; for a minute or two
+an old page may show "Something unexpected came back" for a card question. Card questions are logged
+with status `card` and count against the daily caps. To re-check the classifier after changing
+descriptions or the prompt: `python -m evals.cards_eval run --out evals/results/cards-<date>.json`
+(about 90 neurons; read the score with `... score --in <file>`; the bar is 0 false cards and 90% right).
+
 ### Previewing the page and the themes
 
 After `python scripts/build_site.py page --out _site`, serve `_site` as above and open it. Dark mode
