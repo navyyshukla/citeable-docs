@@ -67,3 +67,19 @@ export function pageState({ hasToken, started }) {
   if (!hasToken) return "invite";
   return started ? "chatting" : "welcome";
 }
+
+// Links offered under a refused question ("New to VisiData? Start here"). They come from the page
+// config; only labelled plain-https links are kept.
+export function startLinks(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter((x) => x && typeof x.text === "string" && x.text !== "" && isHttps(x.url))
+    .map((x) => ({ text: x.text, url: x.url }));
+}
+
+// What the "thinking" line says while a question is being answered. The label is honest (no
+// invented stages); after 3 seconds it says why it may be slow.
+export function thinkingText(elapsedMs) {
+  return elapsedMs >= 3000
+    ? "Still working… the server may be waking up, which can take up to 30 seconds."
+    : "Searching the docs…";
+}

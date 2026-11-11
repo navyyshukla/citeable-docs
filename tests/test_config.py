@@ -127,7 +127,7 @@ def test_new_site_keys_are_required_and_non_empty(tmp_path, key):
             load_config(_variant(tmp_path, lambda d: d["site"].update({key: ""})))
 
 
-@pytest.mark.parametrize("key", ["about_url", "intro_video_url"])
+@pytest.mark.parametrize("key", ["about_url", "intro_video_url", "getting_started_url"])
 @pytest.mark.parametrize("bad", ["javascript:alert(1)", "http://x.example",
                                  "https://x.example/a b", 'https://x.example/"onclick='])
 def test_site_urls_must_be_https_without_unsafe_characters(tmp_path, key, bad):
@@ -138,7 +138,9 @@ def test_site_urls_must_be_https_without_unsafe_characters(tmp_path, key, bad):
 
 
 def test_intro_video_url_is_optional(tmp_path):
-    assert load_config(CONFIG).site.intro_video_url is None
+    cfg = load_config(_variant(tmp_path, lambda d: d["site"].pop("intro_video_url", None)))
+    assert cfg.site.intro_video_url is None  # leaving it out is allowed
+    assert load_config(CONFIG).site.intro_video_url.startswith("https://")  # the shipped file sets it
     cfg = load_config(_variant(tmp_path, lambda d: d["site"].update(
         intro_video_url="https://video.example/watch")))
     assert cfg.site.intro_video_url == "https://video.example/watch"
@@ -149,3 +151,7 @@ def test_intro_key_is_gone(tmp_path):
 
     with pytest.raises(ValidationError):
         load_config(_variant(tmp_path, lambda d: d["site"].update(intro="old text")))
+
+
+def test_getting_started_url_is_optional_and_shipped():
+    assert load_config(CONFIG).site.getting_started_url == "https://www.visidata.org/docs/"

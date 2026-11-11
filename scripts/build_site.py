@@ -38,6 +38,11 @@ def build_page(cfg: Config, out_dir: Path) -> Path:
     links = link.format(esc(cfg.site.about_url), "What is VisiData? ↗")
     if cfg.site.intro_video_url:
         links += link.format(esc(cfg.site.intro_video_url), "▶ Intro video")
+    start_links = [{"text": "What is VisiData? ↗", "url": cfg.site.about_url}]
+    if cfg.site.intro_video_url:
+        start_links.append({"text": "▶ Intro video", "url": cfg.site.intro_video_url})
+    if cfg.site.getting_started_url:
+        start_links.append({"text": "Getting started guide ↗", "url": cfg.site.getting_started_url})
     values = {
         "title": esc(cfg.site.title),
         "brand": esc(cfg.site.brand),
@@ -52,6 +57,7 @@ def build_page(cfg: Config, out_dir: Path) -> Path:
         "config_json": _json_for_script({
             "api_base_url": cfg.site.api_base_url,
             "max_question_chars": cfg.limits.max_question_chars,
+            "start_links": start_links,  # shown under a refused question (page script filters them)
         }),
     }
     page = (SITE / "template.html").read_text(encoding="utf-8")

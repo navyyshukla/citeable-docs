@@ -122,3 +122,14 @@ def test_reduced_motion_rule_exists():
     assert "@media (prefers-reduced-motion: reduce)" in css
     m = re.search(r"@media \(prefers-reduced-motion: reduce\)\s*\{(.*)", css, re.DOTALL)
     assert "transition" in m.group(1) or "animation" in m.group(1)
+
+
+def test_animations_move_only_transform_and_opacity():
+    """Smooth on a phone: only compositor-friendly properties are animated."""
+    css = strip_comments(CSS)
+    frames = re.findall(r"@keyframes\s+[\w-]+\s*\{(.*?\})\s*\}", css, re.DOTALL)
+    assert frames, "expected at least one @keyframes (the thinking dots)"
+    for body in frames:
+        props = set(re.findall(r"([\w-]+)\s*:", re.sub(r"\{[^}]*\}", lambda m: m.group(0), body)))
+        used = {p for p in props if p not in {"from", "to"} and not p.endswith("%")}
+        assert used <= {"transform", "opacity"}, used

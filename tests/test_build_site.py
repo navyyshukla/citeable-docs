@@ -130,7 +130,7 @@ def test_links_open_safely(tmp_path):
     assert len(vid) == 2
     for tag in vid:
         assert 'rel="noopener noreferrer"' in tag and 'target="_blank"' in tag
-    assert html.count("Intro video") == 2
+    assert html.count(">▶ Intro video</a>") == 2  # top bar and hero (the JSON config has the text too)
 
 
 def test_theme_init_script_is_external_and_in_the_head(built):
@@ -175,3 +175,19 @@ def test_evals_subcommand_writes_the_page_from_files(tmp_path):
         tmp_path / "verdicts.json", None, [tmp_path / "q.jsonl"], pieces, out)
     page = out.read_text(encoding="utf-8")
     assert "How do I sort?" in page and "Use &lt;b&gt;." in page and "1/1" in page
+
+
+def test_page_config_carries_the_start_links(tmp_path):
+    import json
+    cfg = load_config(CONFIG)
+    cfg.site.intro_video_url = None
+    cfg.site.getting_started_url = None
+    page = load_builder().build_page(cfg, tmp_path / "a").read_text(encoding="utf-8")
+    data = json.loads(re.search(r'id="page-config">(.*?)</script>', page, re.DOTALL).group(1))
+    assert [x["url"] for x in data["start_links"]] == [cfg.site.about_url]
+    cfg = load_config(CONFIG)
+    page = load_builder().build_page(cfg, tmp_path / "b").read_text(encoding="utf-8")
+    data = json.loads(re.search(r'id="page-config">(.*?)</script>', page, re.DOTALL).group(1))
+    assert [x["url"] for x in data["start_links"]] == [
+        cfg.site.about_url, cfg.site.intro_video_url, cfg.site.getting_started_url]
+    assert all(x["url"].startswith("https://") and x["text"] for x in data["start_links"])

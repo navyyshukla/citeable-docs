@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resultView, questionState, createBannerState, pageState } from "../src/view.js";
+import { resultView, questionState, createBannerState, pageState, startLinks, thinkingText } from "../src/view.js";
 
 const CIT = [
   { n: 1, title: "Join › How to join", url: "https://www.visidata.org/docs/join/#how", docs_version: "3.0" },
@@ -102,4 +102,26 @@ test("pageState: a forgotten device never shows a stale conversation", () => {
   assert.equal(pageState({ hasToken: false, started: true }), "invite");
   assert.equal(pageState({ hasToken: true, started: false }), "welcome");
   assert.equal(pageState({ hasToken: true, started: true }), "chatting");
+});
+
+test("startLinks keeps only labelled https links", () => {
+  const ok = { text: "What is VisiData? ↗", url: "https://www.visidata.org" };
+  const got = startLinks([
+    ok,
+    { text: "x", url: "javascript:alert(1)" },
+    { text: "x", url: "http://plain.example" },
+    { text: "", url: "https://a.example" },
+    { text: "x", url: 'https://a.example/"onclick=' },
+    null, "str", { url: "https://a.example" },
+  ]);
+  assert.deepEqual(got, [ok]);
+  assert.deepEqual(startLinks(undefined), []);
+  assert.deepEqual(startLinks("nope"), []);
+});
+
+test("thinkingText: plain label first, the wake-up note after 3 seconds", () => {
+  assert.equal(thinkingText(0), "Searching the docs…");
+  assert.equal(thinkingText(2999), "Searching the docs…");
+  assert.match(thinkingText(3000), /server may be waking up/);
+  assert.match(thinkingText(3000), /30 seconds/);
 });

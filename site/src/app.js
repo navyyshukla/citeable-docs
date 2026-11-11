@@ -2,8 +2,8 @@
 // view.js, input.js, theme.js and render.js; cards.js builds the conversation pieces. Server text is always put in with textContent (see cards.js).
 import { createApi } from "./api.js";
 import { loadToken, saveToken, forgetToken } from "./token.js";
-import { questionState, createBannerState, pageState } from "./view.js";
-import { buildUserBubble, buildAnswerCard } from "./cards.js";
+import { questionState, createBannerState, pageState, startLinks, thinkingText } from "./view.js";
+import { buildUserBubble, buildAnswerCard, buildThinking, setThinkingText } from "./cards.js";
 import { enterAction, growHeight, scrollBehavior, isTouchDevice } from "./input.js";
 import { readTheme, saveTheme, effectiveTheme, nextTheme } from "./theme.js";
 
@@ -75,13 +75,14 @@ function resizeBox() {
   box.style.overflowY = box.scrollHeight > BOX_MAX ? "auto" : "hidden";
 }
 
-function addExchange(question, result) {
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const card = buildAnswerCard(result, { api, getToken: () => token });
-  $("answers").append(buildUserBubble(question), card);
-  started = true;
-  setState();
-  card.scrollIntoView({ behavior: scrollBehavior(reduced), block: "start" });
+const START_LINKS = startLinks(config.start_links);
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function scrollTo(node) {
+  node.scrollIntoView({ behavior: scrollBehavior(reducedMotion()), block: "start" });
+}
+
+function showDocsInfo(result) {
   if (result && result.docs_version) {
     const date = result.last_updated ? `, last updated ${result.last_updated}` : "";
     $("docs-info").textContent = `Docs version ${result.docs_version}${date}.`;
@@ -92,18 +93,33 @@ async function ask() {
   const question = box.value.trim();
   if (busy || !questionState(question, MAX).canAsk || !token) return;
   busy = true;
+  hideBanner("error"); // an old failure message goes away when the visitor tries again
+  // Chat style: the visitor's message appears at once, with a thinking line under it.
+  const bubble = buildUserBubble(question);
+  const thinking = buildThinking(thinkingText(0));
+  $("answers").append(bubble, thinking);
+  box.value = "";
+  resizeBox();
+  started = true;
+  setState();
   updateControls();
-  showBanner("Looking through the docs…");
-  const slow = setTimeout(() => showBanner(
-    "Looking through the docs… the server may be waking up, which can take up to 30 seconds."), 3000);
+  scrollTo(thinking);
+  const t0 = Date.now();
+  const slow = setTimeout(() => setThinkingText(thinking, thinkingText(Date.now() - t0)), 3000);
   try {
     const result = await api.ask(token, question);
-    addExchange(question, result);
-    box.value = "";
-    resizeBox();
-    hideBanner();
+    const card = buildAnswerCard(result, { api, getToken: () => token, startLinks: START_LINKS });
+    thinking.replaceWith(card);
+    showDocsInfo(result);
+    scrollTo(card);
   } catch (err) {
-    showBanner(err.message, "error"); // the question stays in the box so nothing is lost
+    bubble.remove();
+    thinking.remove();
+    box.value = question; // nothing is lost: the question goes back into the box
+    resizeBox();
+    started = $("answers").querySelector(".card") !== null;
+    setState();
+    showBanner(err.message, "error");
   } finally {
     clearTimeout(slow);
     busy = false;

@@ -68,7 +68,9 @@ printed link, and revoke the token afterwards. Production never sets `DEV_CORS_O
 The opening screen's text lives in `config/visidata.yaml` under `site:`: `brand` (top bar),
 `greeting`, `tagline` (one plain sentence for newcomers) and `about_url` (the "What is VisiData?"
 link) are required; `intro_video_url` is optional and the "Intro video" button is simply left out
-when it is not set. Both URLs must start with `https://` and contain no spaces or quote characters
+when it is not set. `getting_started_url` (optional) is the docs' Getting Started page: it is
+shown with the other two links under any question the assistant could not answer ("New to
+VisiData? Start here"). Every URL here must start with `https://` and contain no spaces or quote characters
 (the build refuses anything else). The welcome screen shows the first three `starter_questions`.
 The old `intro` key is gone.
 

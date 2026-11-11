@@ -75,12 +75,13 @@ class SiteCfg(_Strict):
     tagline: str = Field(min_length=1)  # one plain sentence for visitors who have never used it
     about_url: str  # "What is ...?" link
     intro_video_url: str | None = None  # optional; the link is left out when unset
+    getting_started_url: str | None = None  # optional; shown to visitors whose question was refused
     starter_questions: list[str] = Field(min_length=1, max_length=6)
     privacy_notice: str
     # eval question id -> a note shown on /evals for answers that are wrong because of the docs
     known_wrong: dict[str, str] = {}
 
-    @field_validator("about_url", "intro_video_url")
+    @field_validator("about_url", "intro_video_url", "getting_started_url")
     @classmethod
     def _safe_https_url(cls, v):
         # These go into href attributes: https only, and no character that could break out.

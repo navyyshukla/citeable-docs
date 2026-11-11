@@ -22,6 +22,24 @@ export function buildUserBubble(question) {
   return el("div", "msg-user", question);
 }
 
+// The "thinking" line shown in the feed while an answer is on its way: three pulsing dots (pure
+// CSS, so it stays smooth) and a short honest label. The dots are decoration only.
+export function buildThinking(text) {
+  const wrap = el("div", "thinking");
+  wrap.setAttribute("role", "status");
+  wrap.setAttribute("aria-live", "polite");
+  const dots = el("span", "dots");
+  dots.setAttribute("aria-hidden", "true");
+  dots.append(el("i"), el("i"), el("i"));
+  wrap.append(dots, el("span", "thinking-text", text));
+  return wrap;
+}
+
+export function setThinkingText(node, text) {
+  const t = node.querySelector(".thinking-text");
+  if (t) t.textContent = text;
+}
+
 function feedbackBlock(requestId, { api, getToken }) {
   const wrap = el("div", "feedback");
   wrap.append(el("span", null, "Was this helpful?"));
@@ -85,6 +103,13 @@ export function buildAnswerCard(result, deps) {
       ul.append(li);
     }
     card.append(ul);
+  }
+  const start = kind === "abstained" && deps && Array.isArray(deps.startLinks) ? deps.startLinks : [];
+  if (start.length) {
+    card.append(el("p", "thanks", "New to VisiData? Start here:"));
+    const row = el("div", "links links-card");
+    for (const l of start) row.append(link(l.url, l.text));
+    card.append(row);
   }
   if (v.showFeedback && result.request_id) card.append(feedbackBlock(result.request_id, deps));
   return card;

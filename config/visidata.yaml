@@ -54,6 +54,8 @@ site:
     VisiData is a free keyboard tool for exploring data files like spreadsheets. Every answer
     comes from its docs, with links.
   about_url: https://www.visidata.org
+  intro_video_url: https://youtu.be/N1CBDTgGtOU  # the video demo linked from the docs' Getting Started page
+  getting_started_url: https://www.visidata.org/docs/
   starter_questions:
     - How do I rename a column?
     - How can I convert a CSV file to another file type?
