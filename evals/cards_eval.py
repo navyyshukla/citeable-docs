@@ -82,10 +82,21 @@ def dev_negatives(path: Path | str) -> list[CardQuestion]:
             for q in load_questions(Path(path)) if q.answerable]
 
 
+def with_provider(cfg: Config, entry: str) -> Config:
+    """A copy of the config whose chain is just `entry`, to measure one model on its own."""
+    if entry not in cfg.models.answer_order:
+        raise ValueError(f"{entry!r} is not in models.answer_order")
+    forced = cfg.model_copy(deep=True)
+    forced.models.answer_order = [entry]
+    return forced
+
+
 def run_cards(questions: list[CardQuestion], adapter_factory: Callable[[], Adapter],
-              cfg: Config) -> list[CardRow]:
+              cfg: Config, pause: float = 0.0) -> list[CardRow]:
     rows = []
-    for q in questions:
+    for i, q in enumerate(questions):
+        if pause and i:
+            time.sleep(pause)  # a free tier rate-limits per minute; pacing keeps a run honest
         adapter = adapter_factory()  # fresh per question, like a real request
         t0 = time.monotonic()
         predicted = classify_question(q.question, adapter, cfg)
@@ -130,14 +141,18 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--out", required=True)
     r.add_argument("--questions", default=str(ROOT / "evals/data/cards.jsonl"))
     r.add_argument("--dev", default=str(ROOT / "evals/data/dev.jsonl"))
+    r.add_argument("--pause", type=float, default=0.0, help="seconds between questions")
+    r.add_argument("--provider", help="force one entry of models.answer_order, e.g. groq:openai/gpt-oss-20b")
     s = sub.add_parser("score", help="score a saved run (free)")
     s.add_argument("--in", dest="infile", required=True)
     args = p.parse_args(argv)
     if args.cmd == "run":
         from app.llm.build import build_adapter
         cfg = load_config(args.config)
+        if args.provider:
+            cfg = with_provider(cfg, args.provider)
         qs = load_card_questions(args.questions) + dev_negatives(args.dev)
-        rows = run_cards(qs, lambda: build_adapter(cfg, os.environ), cfg)
+        rows = run_cards(qs, lambda: build_adapter(cfg, os.environ), cfg, args.pause)
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(json.dumps({"rows": [asdict(x) for x in rows],
                                               "report": report_rows(rows)}, indent=2), encoding="utf-8")

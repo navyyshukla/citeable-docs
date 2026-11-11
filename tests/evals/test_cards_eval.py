@@ -6,7 +6,7 @@ from app.config import load_config
 from app.llm.base import Adapter, Completion
 from evals.cards_eval import (
     MAX_FALSE_CARDS, MIN_POSITIVE_RATE, CardRow, CardQuestion, dev_negatives, load_card_questions,
-    report_rows, run_cards, score_cards,
+    report_rows, run_cards, score_cards, with_provider,
 )
 
 CFG = load_config("config/visidata.yaml")
@@ -105,3 +105,23 @@ def test_run_records_which_model_classified_and_how_many_calls():
     rep = report_rows(rows + run_cards(qs, lambda: Adapter([Say("about")]), CFG))
     assert rep["providers"] == {"say:m": 2}
     assert rep["fallback_rows"] == 1  # one question was classified by a later provider
+
+
+def test_with_provider_forces_one_model_from_the_configured_chain():
+    entry = CFG.models.answer_order[-1]
+    forced = with_provider(CFG, entry)
+    assert forced.models.answer_order == [entry]
+    assert CFG.models.answer_order != [entry]  # the original config is untouched
+    with pytest.raises(ValueError):
+        with_provider(CFG, "cloudflare:@cf/not/configured")
+
+
+def test_run_pauses_between_questions_when_asked(monkeypatch):
+    slept = []
+    monkeypatch.setattr("evals.cards_eval.time.sleep", slept.append)
+    qs = [CardQuestion(id=str(i), question="q", label="normal") for i in range(3)]
+    run_cards(qs, lambda: Adapter([Say("normal")]), CFG, pause=1.5)
+    assert slept == [1.5, 1.5]  # between questions, not after the last
+    slept.clear()
+    run_cards(qs, lambda: Adapter([Say("normal")]), CFG)
+    assert slept == []
