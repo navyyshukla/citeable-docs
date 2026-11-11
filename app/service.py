@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from app.answer import Citation, answer_question, validate_question
 from app.classify import classify_question
+from app.help_reply import answer_help
 from app.config import Config
 from app.db import DbUnavailable
 from app.llm.base import Adapter, AllProvidersFailed, ProviderError
@@ -127,8 +128,10 @@ class AnswerService:
             adapter = self.make_adapter()
             kind = classify_question(q, adapter, self.cfg)
             classifier_calls = adapter.calls_made
-            if kind != "normal":  # a fixed card: no search, no answer call, no docs index needed
-                return self._card_reply(rid, kind, adapter)
+            if kind != "normal":  # a card: no docs search, no answer call, no docs index needed
+                # Only the help card gets a model reply (from a fact sheet); None = fixed card.
+                text = answer_help(q, adapter, self.cfg) if kind == "help" else None
+                return self._card_reply(rid, kind, adapter, text)
             index = self._load_index()
             hits = index.searcher.search("hybrid", q, self.cfg.search.top_k)
             a = answer_question(q, hits, index.by_id, adapter, self.cfg, self.cfg.project.name,
@@ -160,18 +163,20 @@ class AnswerService:
         return AskResult(rid, a.status, a.text, a.citations, a.closest, index.docs_ref,
                          index.docs_version, index.last_updated)
 
-    def _card_reply(self, request_id: str, kind: str, adapter: Adapter) -> AskResult:
+    def _card_reply(self, request_id: str, kind: str, adapter: Adapter,
+                    text: str | None = None) -> AskResult:
         done = adapter.last_completion  # which provider and model made the classification
         try:
             self.usage.finish(
-                request_id, status="card", answer_text=f"card:{kind}", citations=[],
+                request_id, status="card",
+                answer_text=f"card:{kind}+model: {text}" if text else f"card:{kind}", citations=[],
                 top_score=None, provider=done.provider if done else None,
                 model=done.model if done else None,
                 neurons=adapter.total_neurons if adapter.calls_made else None,
                 llm_calls=adapter.calls_made, seconds=None, docs_ref=None, error=None)
         except DbUnavailable:
             pass  # the reply is free of the database: return it; the row stays reserved
-        return AskResult(request_id, "card", "", kind=kind)
+        return AskResult(request_id, "card", text or "", kind=kind)
 
     def _log_error(self, request_id: str, error: str, index: _Index | None,
                    adapter: Adapter | None) -> None:
