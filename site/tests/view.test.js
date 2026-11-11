@@ -125,3 +125,20 @@ test("thinkingText: plain label first, the wake-up note after 3 seconds", () => 
   assert.match(thinkingText(3000), /server may be waking up/);
   assert.match(thinkingText(3000), /30 seconds/);
 });
+
+test("each banner kind keeps its own slot: an error or a waking note never erases the warning", () => {
+  const b = createBannerState();
+  b.show("Your browser would not save the invite link.", "warn");
+  b.show("Waking the server up…", "info"); // the cold-start banner arrives 3 s later
+  assert.equal(b.current().kind, "warn"); // the more important message stays on top
+  b.hide("info"); // the server answered
+  assert.equal(b.current().kind, "warn");
+  b.show("The assistant is busy.", "error");
+  assert.equal(b.current().kind, "error");
+  b.hide("error"); // the next send clears the old failure
+  assert.equal(b.current().kind, "warn"); // and the warning comes back
+  b.show("Newer warning text", "warn");
+  assert.equal(b.current().message, "Newer warning text");
+  b.hide();
+  assert.equal(b.current(), null);
+});

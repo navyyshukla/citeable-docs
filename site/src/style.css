@@ -93,8 +93,7 @@ body.chat { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction
   flex: 1; display: flex; flex-direction: column; width: 100%; max-width: 760px;
   padding: 0 20px;
 }
-.chat .hero { display: none; }
-.chat[data-state="welcome"] .hero { display: block; }
+.chat[data-state="chatting"] .hero { display: none; }
 .chat .greeting {
   font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 32px;
   text-align: center; margin: 44px 0 8px;
@@ -140,9 +139,11 @@ body.chat { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction
   border-radius: 10px; background: var(--bg); color: var(--text); resize: vertical;
 }
 .chat .feedback button {
-  min-height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--line);
+  position: relative; min-height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--line);
   background: var(--soft); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer;
 }
+/* the small buttons look 32 px but get a 44 px tap area, like .btn */
+.chat #ask::after, .chat .feedback button::after { content: ""; position: absolute; inset: -6px; }
 .chat .thanks { color: var(--muted); font-size: 0.92rem; }
 
 /* the "thinking" line: three dots that pulse in turn. Only transform and opacity are animated,
@@ -184,7 +185,7 @@ body.chat { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction
 .chat #question {
   flex: 1; min-width: 0; align-self: center; border: 0; outline: 0; resize: none;
   background: transparent; color: var(--text); font: inherit; font-size: 15.5px; line-height: 24px;
-  height: 24px; max-height: 192px; padding: 0;
+  height: 24px; max-height: 192px; padding: 0; overflow-y: hidden; /* the page script lets it scroll at the cap */
 }
 .chat #question::placeholder { color: var(--muted); }
 .chat #ask-form:focus-within { border-color: var(--accent); }
@@ -195,7 +196,7 @@ body.chat { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction
 .chat #ask {
   flex: none; width: 42px; height: 42px; border-radius: 50%; border: 0; padding: 0;
   background: var(--accent); color: var(--accent-text); font: inherit; font-size: 18px;
-  cursor: pointer; display: grid; place-items: center;
+  cursor: pointer; display: grid; place-items: center; position: relative;
 }
 .chat #ask:disabled { opacity: 0.45; cursor: not-allowed; }
 .chat .dock-note { text-align: center; font-size: 11.5px; color: var(--muted); margin: 6px 0 10px; }
@@ -205,11 +206,12 @@ body.chat { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction
 
 /* phone: one column; the links move to the welcome screen, then to the bar once chatting */
 @media (max-width: 719px) {
-  .chat .bar { padding: 0 12px; }
+  .chat .bar { padding: 8px 12px; height: auto; min-height: 52px; flex-wrap: wrap; row-gap: 8px; }
   .chat main { padding: 0 14px; }
   .chat .links-top { display: none; }
-  .chat[data-state="chatting"] .links-top { display: flex; }
-  .chat[data-state="welcome"] .links-hero { display: flex; }
+  /* once chatting, the links get their own full-width row under the bar (no sideways scroll) */
+  .chat[data-state="chatting"] .links-top { display: flex; order: 3; flex-basis: 100%; justify-content: center; margin-left: 0; }
+  .chat:not([data-state="chatting"]) .links-hero { display: flex; }
   .chat .links-hero a { flex: 1; padding: 0 8px; }
   .chat .greeting { font-size: 24px; margin-top: 26px; }
   .chat .tagline { font-size: 13px; }

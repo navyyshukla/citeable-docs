@@ -50,14 +50,23 @@ export function questionState(value, max) {
   return { count, tooLong, canAsk: count > 0 && !tooLong };
 }
 
-// Which banner is showing. A later message of one kind must not remove a different kind: the
-// health check hides only its own "waking" banner, never the "invite not saved" warning.
+// Which banner is showing. Each kind keeps its own slot, so a later message of one kind never
+// erases another: the "waking" note or a failed question cannot wipe out the "invite not saved"
+// warning, which comes back when they go away. When several are set, the most important shows
+// (error, then warn, then info).
+const PRIORITY = ["error", "warn", "info"];
 export function createBannerState() {
-  let state = null;
+  const slots = {};
   return {
-    show(message, kind = "info") { state = { message, kind }; },
-    hide(onlyKind) { if (!onlyKind || (state && state.kind === onlyKind)) state = null; },
-    current() { return state; },
+    show(message, kind = "info") { slots[kind] = { message, kind }; },
+    hide(onlyKind) {
+      if (onlyKind) delete slots[onlyKind];
+      else for (const k of Object.keys(slots)) delete slots[k];
+    },
+    current() {
+      for (const k of PRIORITY) if (slots[k]) return slots[k];
+      return Object.values(slots)[0] || null;
+    },
   };
 }
 

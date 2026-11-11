@@ -5,7 +5,7 @@ import { loadToken, saveToken, forgetToken } from "./token.js";
 import { questionState, createBannerState, pageState, startLinks, thinkingText } from "./view.js";
 import { buildUserBubble, buildAnswerCard, buildThinking, setThinkingText } from "./cards.js";
 import { enterAction, growHeight, scrollBehavior, isTouchDevice } from "./input.js";
-import { readTheme, saveTheme, effectiveTheme, nextTheme } from "./theme.js";
+import { appliedTheme, toggleTheme } from "./theme.js";
 
 const $ = (id) => document.getElementById(id);
 const config = JSON.parse($("page-config").textContent);
@@ -60,7 +60,7 @@ function setState() {
 const darkQuery = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
 const themeButton = $("theme");
 function paintThemeButton() {
-  const dark = effectiveTheme(readTheme(storage), darkQuery()) === "dark";
+  const dark = appliedTheme(document.documentElement, darkQuery()) === "dark";
   themeButton.textContent = dark ? "☀️" : "🌙";
   themeButton.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
 }
@@ -176,9 +176,7 @@ box.addEventListener("keydown", (e) => {
   }
 });
 themeButton.addEventListener("click", () => {
-  const next = nextTheme(readTheme(storage), darkQuery());
-  document.documentElement.dataset.theme = next;
-  saveTheme(storage, next);
+  toggleTheme(document.documentElement, storage, darkQuery());
   paintThemeButton();
 });
 $("ask-form").addEventListener("submit", (e) => {

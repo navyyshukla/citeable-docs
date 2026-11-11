@@ -133,3 +133,49 @@ def test_animations_move_only_transform_and_opacity():
         props = set(re.findall(r"([\w-]+)\s*:", re.sub(r"\{[^}]*\}", lambda m: m.group(0), body)))
         used = {p for p in props if p not in {"from", "to"} and not p.endswith("%")}
         assert used <= {"transform", "opacity"}, used
+
+
+def chat_rules():
+    """(selector, declarations, in_phone_media) for every rule after the marker."""
+    after = CSS.split(MARKER, 1)[1]
+    for prelude, body in blocks(after):
+        if prelude.startswith("@media"):
+            phone = "max-width" in prelude
+            for sel, inner in blocks(body):
+                yield sel, inner, phone
+        elif not prelude.startswith("@"):
+            yield prelude, body, False
+
+
+def rules_for(fragment):
+    return [(sel, body, phone) for sel, body, phone in chat_rules() if fragment in sel]
+
+
+def test_hero_is_hidden_only_while_chatting():
+    """No invite, a cut-off link and Forget this device all keep the greeting and links."""
+    hiding = [sel for sel, body, _ in rules_for(".hero") if re.search(r"display\s*:\s*none", body)
+              and ".links-hero" not in sel]
+    assert hiding, "expected a rule that hides the hero once chatting"
+    assert all('[data-state="chatting"]' in sel for sel in hiding), hiding
+    assert not any(re.search(r"display\s*:\s*none", b) for sel, b, _ in chat_rules()
+                   if sel.strip() == ".chat .hero"), "the hero must not be hidden by default"
+
+
+def test_phone_links_show_on_the_welcome_and_invite_screens():
+    shown = [sel for sel, body, phone in rules_for(".links-hero") if phone
+             and re.search(r"display\s*:\s*flex", body)]
+    assert shown and all('[data-state="chatting"]' in sel and ":not(" in sel for sel in shown), shown
+
+
+def test_small_buttons_have_a_44px_tap_area():
+    for frag in (".chat #ask::after", ".chat .feedback button::after"):
+        found = [b for sel, b, _ in chat_rules() if frag in sel]
+        assert found and re.search(r"inset\s*:\s*-[56]px", found[0]), frag
+
+
+def test_phone_bar_wraps_so_the_links_get_their_own_row():
+    bar = [b for sel, b, phone in rules_for(".bar") if phone and sel.strip() == ".chat .bar"]
+    assert bar and re.search(r"flex-wrap\s*:\s*wrap", bar[0])
+    row = [b for sel, b, phone in rules_for(".links-top") if phone and "chatting" in sel]
+    assert row and re.search(r"flex-basis\s*:\s*100%", row[0])
+    assert re.search(r"order\s*:\s*3", row[0]), "the name and the theme button must share the first row"

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { THEME_KEY, parseTheme, effectiveTheme, nextTheme, readTheme, saveTheme } from "../src/theme.js";
+import { THEME_KEY, parseTheme, effectiveTheme, nextTheme, readTheme, saveTheme, toggleTheme, appliedTheme } from "../src/theme.js";
 
 test("parseTheme accepts only the exact strings", () => {
   assert.equal(parseTheme("light"), "light");
@@ -35,4 +35,26 @@ test("saveTheme reports failure instead of throwing", () => {
   assert.equal(saveTheme({ setItem: (k, v) => { seen[k] = v; } }, "dark"), true);
   assert.equal(THEME_KEY, "theme");
   assert.deepEqual(seen, { theme: "dark" });
+});
+
+const root = (theme) => ({ dataset: theme ? { theme } : {} });
+
+test("toggleTheme keeps flipping when storage is blocked (the page, not storage, is the truth)", () => {
+  for (const storage of [null, { setItem() { throw new Error("blocked"); } }]) {
+    const r = root(null); // no saved choice, light device
+    assert.equal(appliedTheme(r, false), "light");
+    assert.equal(toggleTheme(r, storage, false), "dark");
+    assert.equal(r.dataset.theme, "dark");
+    assert.equal(appliedTheme(r, false), "dark");
+    assert.equal(toggleTheme(r, storage, false), "light");
+    assert.equal(r.dataset.theme, "light");
+  }
+});
+
+test("toggleTheme saves the choice when storage works, and appliedTheme ignores garbage", () => {
+  const seen = {};
+  const r = root("dark");
+  assert.equal(toggleTheme(r, { setItem: (k, v) => { seen[k] = v; } }, true), "light");
+  assert.deepEqual(seen, { theme: "light" });
+  assert.equal(appliedTheme(root("evil"), true), "dark"); // falls back to the device setting
 });

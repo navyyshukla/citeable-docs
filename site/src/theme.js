@@ -30,3 +30,16 @@ export function saveTheme(storage, theme) {
     return false;
   }
 }
+
+// The page itself is the truth about which theme is showing (`root` is the <html> element);
+// storage only remembers it. So the button keeps working when storage is blocked.
+export function appliedTheme(root, systemDark) {
+  return effectiveTheme(root.dataset.theme, systemDark);
+}
+
+export function toggleTheme(root, storage, systemDark) {
+  const next = nextTheme(root.dataset.theme, systemDark);
+  root.dataset.theme = next;
+  saveTheme(storage, next);
+  return next;
+}
