@@ -390,3 +390,48 @@ def test_generate_questions_writes_a_loadable_file_and_sheet_without_network(
     assert sheet.exists() and "body text" not in out.read_text() + sheet.read_text()
     assert main(["generate-questions", "--out", str(out)]) == 1  # refuses to overwrite
     assert "already exists" in capsys.readouterr().err
+
+
+class _Stop(Exception):
+    pass
+
+
+def _eval_with_spy(monkeypatch, tmp_path, extra):
+    """Run `eval --answer` far enough to see which chain build_adapter gets, then stop."""
+    seen = {}
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: [SimpleNamespace(page_slug="p", id="p:0")]
+    store.vector_search = lambda *a: []
+    _wire(monkeypatch, store)
+    q = tmp_path / "q.jsonl"
+    q.write_text('{"id":"a","question":"what does & do?","answerable":false,"source":"synthetic",'
+                 '"split":"dev"}\n')
+
+    def spy(cfg, env, *a, **k):
+        seen["chain"] = list(cfg.models.answer_order)
+        raise _Stop
+
+    monkeypatch.setattr("app.cli.build_adapter", spy)
+    monkeypatch.setattr("app.cli.Searcher", lambda *a, **k: None)
+    with pytest.raises(_Stop):
+        main(["eval", "--answer", "--data", str(q), "--out", str(tmp_path / "r.json"), *extra])
+    return seen["chain"]
+
+
+def test_eval_provider_forces_one_model(monkeypatch, tmp_path):
+    from app.config import load_config
+    entry = load_config("config/visidata.yaml").models.answer_order[-1]
+    assert _eval_with_spy(monkeypatch, tmp_path, ["--provider", entry]) == [entry]
+
+
+def test_eval_without_provider_uses_the_whole_chain(monkeypatch, tmp_path):
+    from app.config import load_config
+    full = load_config("config/visidata.yaml").models.answer_order
+    assert _eval_with_spy(monkeypatch, tmp_path, []) == full
+
+
+def test_eval_provider_must_be_in_the_chain(monkeypatch, tmp_path, capsys):
+    _wire(monkeypatch, FakeStore(stored=1))
+    code = main(["eval", "--answer", "--provider", "cloudflare:@cf/not/configured",
+                 "--out", str(tmp_path / "r.json")])
+    assert code == 1 and "answer_order" in capsys.readouterr().err

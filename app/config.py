@@ -139,3 +139,12 @@ class Config(_Strict):
 def load_config(path: Path | str) -> Config:
     with open(path, encoding="utf-8") as f:
         return Config.model_validate(yaml.safe_load(f))
+
+
+def with_provider(cfg: Config, entry: str) -> Config:
+    """A copy of the config whose answer chain is just `entry`, to measure one model on its own."""
+    if entry not in cfg.models.answer_order:
+        raise ValueError(f"{entry!r} is not in models.answer_order: {cfg.models.answer_order}")
+    forced = cfg.model_copy(deep=True)
+    forced.models.answer_order = [entry]
+    return forced

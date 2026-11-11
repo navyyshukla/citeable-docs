@@ -9,7 +9,7 @@ from pathlib import Path
 
 import httpx
 
-from app.config import load_config
+from app.config import load_config, with_provider
 from app.db import Db
 from app.llm.build import build_adapter
 from app.llm.base import ProviderError
@@ -85,6 +85,12 @@ def cmd_ingest(args) -> int:
 
 def cmd_eval(args) -> int:
     cfg = load_config(args.config)
+    if args.provider:  # measure one model on its own (a fallback, for example)
+        try:
+            cfg = with_provider(cfg, args.provider)
+        except ValueError as e:
+            print(f"{e}", file=sys.stderr)
+            return 1
     store = _store(cfg)
     pieces = store.load_pieces(cfg.project.slug)
     if not pieces:
@@ -296,6 +302,8 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--data", default="evals/data/dev.jsonl")
     e.add_argument("--answer", action="store_true")
     e.add_argument("--max-neurons", type=float, default=1500.0)
+    e.add_argument("--provider", help="force one entry of models.answer_order, "
+                                       "e.g. groq:openai/gpt-oss-20b")
     e.add_argument("--out", required=True)
     e.add_argument("--config", default=argparse.SUPPRESS)
     c = sub.add_parser("calibrate")

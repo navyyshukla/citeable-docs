@@ -20,7 +20,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, ValidationError
 
 from app.classify import classify_question
-from app.config import Config, load_config
+from app.config import Config, load_config, with_provider  # noqa: F401 - re-exported
 from app.llm.base import Adapter
 from evals.schema import load_questions
 
@@ -80,15 +80,6 @@ def dev_negatives(path: Path | str) -> list[CardQuestion]:
     return [CardQuestion(id=f"dev:{q.id}", question=q.question, label="normal",
                          note="answerable dev question")
             for q in load_questions(Path(path)) if q.answerable]
-
-
-def with_provider(cfg: Config, entry: str) -> Config:
-    """A copy of the config whose chain is just `entry`, to measure one model on its own."""
-    if entry not in cfg.models.answer_order:
-        raise ValueError(f"{entry!r} is not in models.answer_order")
-    forced = cfg.model_copy(deep=True)
-    forced.models.answer_order = [entry]
-    return forced
 
 
 def run_cards(questions: list[CardQuestion], adapter_factory: Callable[[], Adapter],
