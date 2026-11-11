@@ -503,3 +503,64 @@ def test_generate_questions_heldout_skips_earlier_pieces_and_uses_its_own_ids(
     assert "pg0" not in {q.gold_page for q in qs}
     assert main(["generate-questions", "--out", str(tmp_path / "b.jsonl"), "--exclude-from",
                  str(tmp_path / "missing.jsonl")]) == 1
+
+
+def _two_answer_files(tmp_path):
+    import json
+    q = tmp_path / "q.jsonl"
+    q.write_text("".join(json.dumps({"id": i, "question": f"public paraphrase {i}",
+                                     "answerable": True, "gold_page": "join", "source": "synthetic",
+                                     "split": "dev", "reference_answer": "ref"}) + "\n"
+                         for i in ("a", "b")))
+    rows = [{"id": i, "status": "answered", "text": "It joins [1].", "cited_ids": ["join:0"],
+             "question": f"public paraphrase {i}"} for i in ("a", "b")]
+    res = tmp_path / "res.json"
+    res.write_text(json.dumps({"meta": {"split": "dev"}, "answers": {"hybrid": rows}}))
+    return q, res
+
+
+def _judge_env(monkeypatch, replies, slept):
+    from app.llm.base import Completion, ProviderError
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: [SimpleNamespace(id="join:0", text="Type & to join.")]
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.cli.Store", lambda db, dim, **kw: store)
+    calls = []
+
+    class G:
+        def __init__(self, key, json_output=False):
+            pass
+
+        def complete(self, s, u, n):
+            calls.append(u)
+            r = replies.pop(0)
+            if r == "429":
+                raise ProviderError("HTTP 429", status=429)
+            return Completion('{"grounded": true, "correct": true, "reason": "ok"}', "gemini", "m",
+                              1, 1, None, 0.1)
+
+    monkeypatch.setattr("app.cli.GeminiProvider", G)
+    monkeypatch.setattr("app.cli.time.sleep", slept.append)
+    return calls
+
+
+def test_judge_pauses_between_calls_and_resume_redoes_only_the_errors(monkeypatch, tmp_path):
+    import json
+    q, res = _two_answer_files(tmp_path)
+    slept = []
+    calls = _judge_env(monkeypatch, ["ok", "429"], slept)
+    out = tmp_path / "v.json"
+    args = ["judge", "--results", str(res), "--data", str(q), "--mode", "hybrid",
+            "--out", str(out)]
+    assert main(args + ["--pause", "3"]) == 0
+    first = json.loads(out.read_text())
+    assert [bool(v["error"]) for v in first] == [False, True] and slept == [3.0]
+    # resume: the good verdict is kept (no call for it); only the errored one is asked again
+    calls.clear()
+    slept.clear()
+    calls2 = _judge_env(monkeypatch, ["ok"], slept)
+    assert main(args + ["--pause", "3", "--resume"]) == 0
+    second = json.loads(out.read_text())
+    assert len(calls2) == 1 and [bool(v["error"]) for v in second] == [False, False]
+    assert second[0]["question_id"] == "a" and second[1]["question_id"] == "b"

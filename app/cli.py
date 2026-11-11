@@ -4,6 +4,7 @@ import json
 from dataclasses import asdict
 import os
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -208,7 +209,20 @@ def cmd_judge(args) -> int:
         print(e, file=sys.stderr)
         return 1
     provider = GeminiProvider(os.environ["GEMINI_API_KEY"], json_output=True)
-    verdicts = [judge_answer(i, provider) for i in items]
+    previous = {}  # --resume keeps the good verdicts of an earlier run and redoes only the errors
+    if args.resume and Path(args.out).exists():
+        previous = {v["question_id"]: v for v in json.loads(Path(args.out).read_text(encoding="utf-8"))
+                    if not v.get("error")}
+    verdicts = []
+    asked = False
+    for item in items:
+        if item.question_id in previous:
+            verdicts.append(JudgeVerdict(**previous[item.question_id]))
+            continue
+        if asked and args.pause:
+            time.sleep(args.pause)  # the Gemini free tier rate-limits per minute (HTTP 429)
+        verdicts.append(judge_answer(item, provider))
+        asked = True
     Path(args.out).write_text(json.dumps([asdict(v) for v in verdicts], indent=2),
                               encoding="utf-8")
     errors = sum(1 for v in verdicts if v.error)
@@ -333,6 +347,9 @@ def main(argv: list[str] | None = None) -> int:
     j.add_argument("--results", required=True)
     j.add_argument("--data", default="evals/data/dev.jsonl")
     j.add_argument("--mode", default="hybrid")
+    j.add_argument("--pause", type=float, default=6.0, help="seconds between Gemini calls")
+    j.add_argument("--resume", action="store_true",
+                   help="keep good verdicts already in --out; redo only the errors")
     j.add_argument("--out", required=True)
     j.add_argument("--config", default=argparse.SUPPRESS)
     q = sub.add_parser("generate-questions")
