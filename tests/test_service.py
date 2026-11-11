@@ -357,6 +357,7 @@ def test_card_row_is_logged():
     assert rid == r.request_id and kw["status"] == "card" and kw["answer_text"] == "card:help"
     assert kw["llm_calls"] == 1 and kw["neurons"] == 2.5 and kw["citations"] == []
     assert kw.get("retrieved_ids") is None and kw["error"] is None
+    assert (kw["provider"], kw["model"]) == ("fake", "m")  # who classified, so the beta can see
 
 
 def test_classifier_failure_falls_through_to_the_normal_answer():

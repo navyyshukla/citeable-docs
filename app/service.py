@@ -161,10 +161,12 @@ class AnswerService:
                          index.docs_version, index.last_updated)
 
     def _card_reply(self, request_id: str, kind: str, adapter: Adapter) -> AskResult:
+        done = adapter.last_completion  # which provider and model made the classification
         try:
             self.usage.finish(
                 request_id, status="card", answer_text=f"card:{kind}", citations=[],
-                top_score=None, provider=None, model=None,
+                top_score=None, provider=done.provider if done else None,
+                model=done.model if done else None,
                 neurons=adapter.total_neurons if adapter.calls_made else None,
                 llm_calls=adapter.calls_made, seconds=None, docs_ref=None, error=None)
         except DbUnavailable:

@@ -5,7 +5,7 @@ one-word label is accepted back. Anything else, including any failure, means "no
 visitor never sees a classifier error and a card is never shown on a guess.
 """
 from app.config import Config
-from app.llm.base import Adapter, AllProvidersFailed, ProviderError
+from app.llm.base import Adapter
 
 LABELS = ("about", "help", "normal")
 _EDGE = " \t\r\n.,;:!?\"'`*()[]"
@@ -41,6 +41,6 @@ def classify_question(question: str, adapter: Adapter, cfg: Config) -> str:
     try:
         c = adapter.complete(system, user, cfg.limits.classifier_max_tokens,
                              cfg.limits.classifier_timeout_seconds)
-    except (ProviderError, AllProvidersFailed):
+    except Exception:  # noqa: BLE001 - fail open: any problem at all means a normal question
         return "normal"
     return parse_label(c.text)

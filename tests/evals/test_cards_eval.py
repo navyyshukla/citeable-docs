@@ -6,7 +6,7 @@ from app.config import load_config
 from app.llm.base import Adapter, Completion
 from evals.cards_eval import (
     MAX_FALSE_CARDS, MIN_POSITIVE_RATE, CardRow, CardQuestion, dev_negatives, load_card_questions,
-    run_cards, score_cards,
+    report_rows, run_cards, score_cards,
 )
 
 CFG = load_config("config/visidata.yaml")
@@ -89,3 +89,19 @@ def test_run_uses_a_fresh_adapter_per_question_and_reports_neurons():
     assert [r.predicted for r in rows] == ["about", "about"]
     assert [r.neurons for r in rows] == [2.0, 2.0]
     assert score_cards(rows).false_cards == 1  # the model said about for a normal question
+
+
+def test_run_records_which_model_classified_and_how_many_calls():
+    class Down:
+        name = "down"
+
+        def complete(self, *a):
+            from app.llm.base import ProviderError
+            raise ProviderError("network error: ReadTimeout")
+
+    qs = [CardQuestion(id="a", question="what is visidata", label="about")]
+    rows = run_cards(qs, lambda: Adapter([Down(), Say("about")]), CFG)
+    assert (rows[0].provider, rows[0].model, rows[0].calls) == ("say", "m", 2)
+    rep = report_rows(rows + run_cards(qs, lambda: Adapter([Say("about")]), CFG))
+    assert rep["providers"] == {"say:m": 2}
+    assert rep["fallback_rows"] == 1  # one question was classified by a later provider

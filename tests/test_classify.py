@@ -98,3 +98,15 @@ def test_a_timed_out_provider_falls_through_to_the_next_then_to_normal():
 
     assert classify_question("q", Adapter([Slow(), Say("help")]), CFG) == "help"
     assert classify_question("q", Adapter([Slow(), Slow()]), CFG) == "normal"
+
+
+@pytest.mark.parametrize("error", [TypeError("bad usage field"), AttributeError("no get"),
+                                   ValueError("socket"), KeyError("x")])
+def test_classify_never_raises_whatever_the_provider_does(error):
+    class Weird:
+        name = "weird"
+
+        def complete(self, *a):
+            raise error
+
+    assert classify_question("q", Adapter([Weird()]), CFG) == "normal"

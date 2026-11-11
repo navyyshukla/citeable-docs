@@ -68,3 +68,14 @@ def test_timeout_is_forwarded_only_when_given():
     a.complete("s", "u", 16)  # old three-argument call: providers see exactly that
     a.complete("s", "u", 16, timeout=5.0)
     assert seen[0] == (("s", "u", 16), {}) and seen[1] == (("s", "u", 16, 5.0), {})
+
+
+def test_last_completion_is_the_latest_success():
+    a = Adapter([Fake("main", error=ProviderError("429", 429)), Fake("backup", "ok")])
+    assert a.last_completion is None
+    a.complete("s", "u", 50)
+    assert a.last_completion.provider == "backup"  # who actually answered, after the fallback
+    b = Adapter([Fake("main", error=ProviderError("429", 429))])
+    with pytest.raises(AllProvidersFailed):
+        b.complete("s", "u", 50)
+    assert b.last_completion is None

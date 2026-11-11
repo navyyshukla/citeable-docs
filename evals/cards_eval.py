@@ -44,6 +44,9 @@ class CardRow:
     predicted: str
     neurons: float
     seconds: float
+    provider: str | None = None  # who classified (after any fallback)
+    model: str | None = None
+    calls: int = 0  # more than 1 means a provider failed or timed out first
 
 
 @dataclass(frozen=True)
@@ -86,8 +89,10 @@ def run_cards(questions: list[CardQuestion], adapter_factory: Callable[[], Adapt
         adapter = adapter_factory()  # fresh per question, like a real request
         t0 = time.monotonic()
         predicted = classify_question(q.question, adapter, cfg)
+        done = adapter.last_completion
         rows.append(CardRow(q.id, q.question, q.label, predicted, adapter.total_neurons,
-                            time.monotonic() - t0))
+                            time.monotonic() - t0, done.provider if done else None,
+                            done.model if done else None, adapter.calls_made))
     return rows
 
 
@@ -104,12 +109,14 @@ def confusion(rows: list[CardRow]) -> dict[str, int]:
     return {f"{k[0]} -> {k[1]}": v for k, v in sorted(Counter((r.label, r.predicted) for r in rows).items())}
 
 
-def _report(rows: list[CardRow]) -> dict:
+def report_rows(rows: list[CardRow]) -> dict:
     s = score_cards(rows)
     secs = sorted(r.seconds for r in rows)
     return {"score": asdict(s), "confusion": confusion(rows),
             "misses": [{"id": r.id, "question": r.question, "label": r.label,
                         "predicted": r.predicted} for r in rows if r.predicted != r.label],
+            "providers": dict(Counter(f"{r.provider}:{r.model}" for r in rows)),
+            "fallback_rows": sum(r.calls > 1 for r in rows),
             "neurons_total": round(sum(r.neurons for r in rows), 2),
             "seconds_median": round(secs[len(secs) // 2], 2) if secs else None,
             "seconds_max": round(secs[-1], 2) if secs else None}
@@ -133,12 +140,12 @@ def main(argv: list[str] | None = None) -> int:
         rows = run_cards(qs, lambda: build_adapter(cfg, os.environ), cfg)
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(json.dumps({"rows": [asdict(x) for x in rows],
-                                              "report": _report(rows)}, indent=2), encoding="utf-8")
-        print(json.dumps(_report(rows), indent=2))
+                                              "report": report_rows(rows)}, indent=2), encoding="utf-8")
+        print(json.dumps(report_rows(rows), indent=2))
     else:
         data = json.loads(Path(args.infile).read_text(encoding="utf-8"))
         rows = [CardRow(**x) for x in data["rows"]]
-        print(json.dumps(_report(rows), indent=2))
+        print(json.dumps(report_rows(rows), indent=2))
     return 0
 
 

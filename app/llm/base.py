@@ -47,6 +47,7 @@ class Adapter:
         self.providers = providers
         self.calls_made = 0
         self.total_neurons = 0.0
+        self.last_completion: Completion | None = None  # who actually answered, after fallbacks
 
     def complete(self, system: str, user: str, max_tokens: int,
                  timeout: float | None = None) -> Completion:
@@ -65,5 +66,6 @@ class Adapter:
                 errors.append(f"{label}: {e}")
                 continue
             self.total_neurons += c.neurons or 0.0
+            self.last_completion = c
             return c
         raise AllProvidersFailed("; ".join(errors))
