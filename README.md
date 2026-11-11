@@ -47,9 +47,15 @@ What a visitor gets:
 
 ## Does it work? (read `/evals` before trusting any number)
 
-The `/evals` page shows the measured results with their ranges and caveats. In short, on a small development set of 28 questions (19 answerable, 9 not): it refused all 9 unanswerable questions, answered 16 to 17 of the 19 across three runs, and never produced a citation to a page it was not given. A separate classifier test (62 questions) routed every question correctly with gemma and sent no real how-to question to a card. These sets are small, one question moves a rate by about 5 points, the AI judge used for part of the checking is only a rough filter, and the docs themselves contain at least one error the assistant repeats (the sort page's `[` and `]` keys). Friends' questions in the beta are the held-out check.
+The `/evals` page shows every measured result with its count, range and caveats. In short:
+- **It refuses what the docs do not cover:** 60 of 60 hand-written questions the docs do not answer (near-miss features, other tools, off-topic, attempts to override its rules, vague questions, code requests) were refused in each of 3 runs, plus 9 of 9 on the development set in each of 5 runs. Nothing was answered by guessing.
+- **On 98 questions nobody tuned for** (a sealed set, generated from docs pieces no earlier test used and kept only when two independent AI readers agreed): it answered 74 (76%, 95% range 66 to 83%) and cited the right docs page in 66 of those 74; 24 got "not found", mostly because the right page was not found by search. No invalid citations in any run.
+- **Classifier and cards:** 62 of 62 test questions routed correctly with the main model, with no real how-to question sent to a card.
+- **The backup models were measured too** and one was removed: a smaller model answered 9 of 60 questions the docs do not cover, so the answer chain is now the main model and Groq, then an honest "busy" message.
 
-Known limits: no memory between questions (follow-up questions like "what else?" cannot be answered yet); free-tier cold starts; the answer quality depends on what the docs say.
+These sets are small: one question moves a rate by about 5 points. The held-out labels are AI-checked only and no human has graded those answers yet; the AI judge used for part of the checking is a rough filter that cannot see docs errors; and the docs contain at least one error the assistant repeats (the sort page's `[` and `]` keys). Friends' questions in the beta are the next held-out check.
+
+Known limits: no memory between questions (follow-up questions like "what else?" cannot be answered yet); free-tier cold starts; search misses some plainly worded questions; answer quality depends on what the docs say.
 
 ## Repository map
 
