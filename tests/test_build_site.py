@@ -222,3 +222,57 @@ def test_hostile_card_text_cannot_close_the_script_block(tmp_path):
     about = _page_config(page)["cards"]["about"]
     assert about["label"] == "</script><script>evil()</script>"  # back to the same plain text
     assert about["paragraphs"] == ['<b>bold</b> & "quotes"']
+
+
+def test_evals_page_gets_extra_sections_from_a_sets_spec(tmp_path):
+    import json
+
+    from ingest.models import Piece
+
+    def row(i, answerable, status, ok=None):
+        return {"id": i, "mode": "hybrid", "answerable": answerable, "status": status,
+                "abstained_correctly": ok, "invalid_citations": 0, "llm_calls": 1, "neurons": 1.0,
+                "seconds": 1.0, "cited_ids": ["sort:1"] if status == "answered" else [],
+                "cited_gold": True, "error": None, "question": "q", "text": "t", "top_score": 0.03}
+
+    def write_run(name, rows, retrieval=None):
+        p = tmp_path / name
+        p.write_text(json.dumps({"meta": {"split": "dev", "ref": "stable", "n_questions": len(rows)},
+                                 "retrieval": {"hybrid": retrieval or []},
+                                 "answers": {"hybrid": rows}}), encoding="utf-8")
+        return str(p)
+
+    dev = write_run("dev.json", [row("r-001", True, "answered"), row("r-002", False, "abstained", True)],
+                    [{"id": "r-001", "mode": "hybrid", "answerable": True, "hit": True,
+                      "top_ids": ["sort:1"], "top_scores": [], "error": None}])
+    refusal = write_run("ref.json", [row("u-001", False, "abstained", True)])
+    held = write_run("held.json", [row("h-001", True, "answered")],
+                     [{"id": "h-001", "mode": "hybrid", "answerable": True, "hit": True,
+                       "top_ids": ["sort:1"], "top_scores": [], "error": None}])
+    (tmp_path / "labels.jsonl").write_text('{"question_id": "r-001", "correct": true}\n')
+    (tmp_path / "verdicts.json").write_text("[]")
+    (tmp_path / "held.jsonl").write_text(json.dumps(
+        {"id": "h-001", "question": "held q?", "answerable": True, "gold_page": "sort",
+         "gold_heading": "Sort", "source": "synthetic", "split": "heldout"}) + "\n")
+    (tmp_path / "q.jsonl").write_text(
+        json.dumps({"id": "r-001", "question": "How do I sort?", "answerable": True,
+                    "gold_page": "sort", "source": "real", "split": "dev"}) + "\n"
+        + json.dumps({"id": "r-002", "question": "weather?", "answerable": False,
+                      "source": "real", "split": "dev"}) + "\n", encoding="utf-8")
+    (tmp_path / "hv.json").write_text(json.dumps([{"question_id": "h-001", "grounded": True,
+                                                    "correct": True, "reason": "", "error": None}]))
+    spec = {"refusal": {"runs": [refusal]},
+            "heldout": {"questions": str(tmp_path / "held.jsonl"), "runs": [held],
+                        "verdicts": str(tmp_path / "hv.json")},
+            "models": {"gemma": {"dev": dev, "refusal": refusal}}}
+    pieces = {"sort:1": Piece("sort:1", "sort", "Sort rows", "https://www.visidata.org/docs/sort/",
+                              "", ("Sort",), "t", "stable", None, None)}
+    out = tmp_path / "evals.html"
+    load_builder().build_evals(load_config(CONFIG), [dev], tmp_path / "labels.jsonl",
+                               tmp_path / "verdicts.json", None, [tmp_path / "q.jsonl"], pieces, out,
+                               sets=spec)
+    page = out.read_text(encoding="utf-8")
+    assert "Refusal test: questions the docs do not answer" in page
+    assert "Held-out test: answerable questions nobody tuned for" in page
+    assert "The answer models side by side" in page
+    assert "AI-checked only, not human-checked" in page

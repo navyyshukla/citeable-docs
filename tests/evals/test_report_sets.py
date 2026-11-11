@@ -114,3 +114,18 @@ def test_sections_render_between_trust_and_known_wrong_and_are_escaped():
     page = render_evals_html(rep, CFG)
     assert page.index("How much to trust") < page.index(s.title) < page.index("Known wrong answers")
     assert "<script>x" not in page and "&lt;script&gt;x" in page and "note &amp; more" in page
+
+
+def test_heldout_reports_run_one_with_the_range_over_all_runs():
+    run1 = held_run(["sort:1", "sort:1", "sort:1", None])      # 3 answered (the reported run)
+    run2 = held_run(["sort:1", "sort:1", None, None])          # 2 answered
+    run3 = held_run(["sort:1", "sort:1", "sort:1", "sort:1"])  # 4 answered
+    s = heldout_section([run1, run2, run3], QS, {}, PIECES)
+    answered = {x.label: x for x in s.stats}["answered"]
+    assert (answered.k, answered.n) == (3, 4)            # run 1, not the latest run
+    assert answered.spread == (0.5, 1.0) and answered.runs == 3
+
+
+def test_refusal_notes_say_the_classifier_is_not_in_this_test():
+    s = refusal_section([refused()])
+    assert any("classifier" in n for n in s.notes)

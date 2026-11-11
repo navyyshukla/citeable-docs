@@ -1,0 +1,13 @@
+{
+  "refusal": {"runs": ["evals/results/refusal-1.json", "evals/results/refusal-2.json", "evals/results/refusal-3.json"]},
+  "heldout": {
+    "questions": "evals/data/heldout.jsonl",
+    "runs": ["evals/results/heldout-1.json", "evals/results/heldout-2.json", "evals/results/heldout-3.json"],
+    "verdicts": "evals/results/heldout-1-verdicts.json"
+  },
+  "models": {
+    "gemma (main)": {"dev": "evals/results/dev-4.json", "refusal": "evals/results/refusal-1.json"},
+    "Groq gpt-oss-20b (fallback)": {"dev": "evals/results/dev-groq.json", "refusal": "evals/results/refusal-groq.json"},
+    "llama-3.1-8b (removed)": {"dev": "evals/results/dev-llama.json", "refusal": "evals/results/refusal-llama.json"}
+  }
+}

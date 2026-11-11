@@ -3,6 +3,7 @@
 The page text never depends on the API being awake: it is rendered into the HTML here.
 """
 import argparse
+import dataclasses
 import html
 import json
 import shutil
@@ -83,8 +84,30 @@ def build_page(cfg: Config, out_dir: Path) -> Path:
     return index
 
 
+def _load_run(path) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _sets_sections(sets: dict, pieces) -> list:
+    """The extra /evals sections from a spec of saved run files (see evals/data/report-sets.json)."""
+    from evals.report_sets import heldout_section, models_section, refusal_section
+    from evals.schema import load_questions
+    out = []
+    if "refusal" in sets:
+        out.append(refusal_section([_load_run(p) for p in sets["refusal"]["runs"]]))
+    if "heldout" in sets:
+        h = sets["heldout"]
+        verdicts = {v["question_id"]: v for v in _load_run(h["verdicts"])} if h.get("verdicts") else {}
+        out.append(heldout_section([_load_run(p) for p in h["runs"]],
+                                   load_questions(Path(h["questions"])), verdicts, pieces))
+    if "models" in sets:
+        out.append(models_section({name: {k: _load_run(p) for k, p in files.items()}
+                                   for name, files in sets["models"].items()}))
+    return out
+
+
 def build_evals(cfg: Config, run_paths, labels_path, verdicts_path, trap, question_paths,
-                pieces, out: Path) -> Path:
+                pieces, out: Path, sets: dict | None = None) -> Path:
     """Write the public /evals page from saved files. `trap` is a (traps, verdicts) pair or None."""
     from evals.judge_traps import _load_traps, load_verdicts, score
     from evals.report import build_report, render_evals_html
@@ -103,6 +126,8 @@ def build_evals(cfg: Config, run_paths, labels_path, verdicts_path, trap, questi
     trap_score = score(_load_traps(str(trap[0])), load_verdicts(Path(trap[1]))) if trap else None
     report = build_report(runs, labels, verdicts, trap_score, questions, pieces,
                           cfg.site.known_wrong)
+    if sets:
+        report = dataclasses.replace(report, sections=_sets_sections(sets, pieces))
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render_evals_html(report, cfg), encoding="utf-8")
@@ -123,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--trap-verdicts", help="judge verdicts for the traps file")
     ev.add_argument("--questions", action="append",
                     default=None, help="question files (default: dev.jsonl and synthetic.jsonl)")
+    ev.add_argument("--sets", help="JSON spec of extra test sets (evals/data/report-sets.json)")
     ev.add_argument("--out", required=True)
     args = p.parse_args(argv)
     cfg = load_config(args.config)
@@ -136,8 +162,9 @@ def main(argv: list[str] | None = None) -> int:
         qfiles = args.questions or [str(ROOT / "evals/data/dev.jsonl")] + [
             str(f) for f in [ROOT / "evals/data/synthetic.jsonl"] if f.exists()]
         trap = (args.trap, args.trap_verdicts) if args.trap else None
+        sets = json.loads(Path(args.sets).read_text(encoding="utf-8")) if args.sets else None
         print(build_evals(cfg, args.run, args.labels, args.verdicts, trap, qfiles, pieces,
-                          Path(args.out)))
+                          Path(args.out), sets))
     return 0
 
 

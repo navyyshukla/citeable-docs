@@ -11,9 +11,10 @@ from evals.stats import fraction_text
 from ingest.models import Piece
 
 
-def _series(label: str, per_run: list[tuple[int, int]]) -> Stat:
-    """The latest run's count, with the spread over all runs that have data."""
-    k, n = per_run[-1]
+def _series(label: str, per_run: list[tuple[int, int]], shown: int = -1) -> Stat:
+    """One run's count (the latest by default; `shown=0` for a sealed set's reported first run),
+    with the spread over all runs that have data."""
+    k, n = per_run[shown]
     usable = [Stat(label, a, b) for a, b in per_run if b]
     spread = _rate_spread(usable) if len(usable) > 1 else None
     return Stat(label, k, n, spread, len(usable) if spread else 0)
@@ -28,7 +29,10 @@ def refusal_section(runs: list[dict]) -> Section:
                             if not x["answerable"] and x["status"] == "answered")
         errors += c["errors"]
     notes = [f"{len(runs)} run{'s' if len(runs) != 1 else ''} of the same questions: the range shows "
-             "run-to-run wobble, not performance on new questions."]
+             "run-to-run wobble, not performance on new questions.",
+             "These questions go straight to the answer step. In the live assistant a question "
+             "like 'what is VisiData?' or 'what can you do?' is caught earlier by a classifier and "
+             "shown a fixed card, which this test does not include."]
     if answered_any:
         notes.append(f"{answered_any} question(s) the docs are not meant to cover were answered in at "
                      "least one run. Each answer is read together with its cited pages to decide "
@@ -68,12 +72,12 @@ def heldout_section(runs: list[dict], questions: list[EvalQuestion], verdicts: d
         series["top5_page"].append((sum(_page_hit(x, by_id, pieces) for x in ret), len(ret)))
         series["top5_section"].append((sum(1 for x in ret if x["hit"]), len(ret)))
     stats = [
-        _series("answered", series["answered"]),
-        _series("of the answered, cited the right page (any section)", series["page"]),
-        _series("of the answered, cited the right page and section", series["section"]),
-        _series("answers with an invalid citation", series["invalid"]),
-        _series("right page (any section) in top 5", series["top5_page"]),
-        _series("right page and section in top 5", series["top5_section"]),
+        _series("answered", series["answered"], 0),
+        _series("of the answered, cited the right page (any section)", series["page"], 0),
+        _series("of the answered, cited the right page and section", series["section"], 0),
+        _series("answers with an invalid citation", series["invalid"], 0),
+        _series("right page (any section) in top 5", series["top5_page"], 0),
+        _series("right page and section in top 5", series["top5_section"], 0),
     ]
     first = [x for x in _answer_rows(runs[0]) if x["status"] == "answered"] if runs else []
     judged = [verdicts[x["id"]]["correct"] for x in first
