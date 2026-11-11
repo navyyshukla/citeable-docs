@@ -122,7 +122,7 @@ def cmd_eval(args) -> int:
             if adapter:
                 rows, early = run_answers(questions, searcher, by_id, adapter, cfg,
                                           cfg.project.name, mode, cfg.search.top_k,
-                                          args.max_neurons)
+                                          args.max_neurons, args.pause)
                 answers[mode], stopped[mode] = rows, early
                 print(mode, "answers:", summarize_answers(rows), "stopped_early:", early)
     except Exception as e:
@@ -302,6 +302,8 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--data", default="evals/data/dev.jsonl")
     e.add_argument("--answer", action="store_true")
     e.add_argument("--max-neurons", type=float, default=1500.0)
+    e.add_argument("--pause", type=float, default=0.0,
+                   help="seconds between questions (Groq needs about 14)")
     e.add_argument("--provider", help="force one entry of models.answer_order, "
                                        "e.g. groq:openai/gpt-oss-20b")
     e.add_argument("--out", required=True)

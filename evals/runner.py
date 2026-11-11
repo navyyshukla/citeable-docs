@@ -1,5 +1,6 @@
 """Run code-graded evals: retrieval hit rate, abstention, citation validity, calls, neurons."""
 import json
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -81,10 +82,12 @@ def _error_row(q: EvalQuestion, mode: str, e: Exception) -> AnswerRow:
 
 def run_answers(questions: list[EvalQuestion], searcher: Searcher, pieces_by_id: dict[str, Piece],
                 adapter: Adapter, cfg: Config, project_name: str, mode: str, k: int,
-                max_neurons: float) -> tuple[list[AnswerRow], bool]:
+                max_neurons: float, pause: float = 0.0) -> tuple[list[AnswerRow], bool]:
     rows: list[AnswerRow] = []
     worst = 0.0  # most neurons one question has cost so far: keep room for one more
-    for q in questions:
+    for i, q in enumerate(questions):
+        if pause and i:
+            time.sleep(pause)  # free tiers rate-limit per minute (Groq: 8,000 tokens)
         if adapter.total_neurons + worst >= max_neurons:
             return rows, True
         spent_before = adapter.total_neurons

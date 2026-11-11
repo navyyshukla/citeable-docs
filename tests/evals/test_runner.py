@@ -223,3 +223,17 @@ def test_hybrid_eval_uses_the_configured_threshold_other_modes_do_not():
     rows, _ = run_answers(qs, hybrid, BY_ID, Adapter([Fake()]), cfg, "VisiData", "hybrid", 3,
                           max_neurons=1000)
     assert rows[0].status == "abstained" and rows[0].llm_calls == 0
+
+
+def test_run_answers_pauses_between_questions_only_when_asked(monkeypatch):
+    slept = []
+    monkeypatch.setattr("evals.runner.time.sleep", slept.append)
+    qs = [q("1", "what does & do?", page="join"), q("2", "what does & do?", page="join"),
+          q("3", "what does & do?", page="join")]
+    run_answers(qs, SEARCH, BY_ID, Adapter([Fake()]), CFG, "VisiData", "keyword", 3,
+                max_neurons=1000, pause=2.5)
+    assert slept == [2.5, 2.5]  # between questions, not before the first
+    slept.clear()
+    run_answers(qs, SEARCH, BY_ID, Adapter([Fake()]), CFG, "VisiData", "keyword", 3,
+                max_neurons=1000)
+    assert slept == []

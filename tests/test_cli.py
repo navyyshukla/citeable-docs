@@ -435,3 +435,28 @@ def test_eval_provider_must_be_in_the_chain(monkeypatch, tmp_path, capsys):
     code = main(["eval", "--answer", "--provider", "cloudflare:@cf/not/configured",
                  "--out", str(tmp_path / "r.json")])
     assert code == 1 and "answer_order" in capsys.readouterr().err
+
+
+def test_eval_parser_accepts_pause(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_run_answers(*a, **k):
+        captured["pause"] = k.get("pause")
+        raise _Stop
+
+    store = FakeStore(stored=1)
+    store.load_pieces = lambda project: [SimpleNamespace(page_slug="p", id="p:0")]
+    store.vector_search = lambda *a: []
+    _wire(monkeypatch, store)
+    q = tmp_path / "q.jsonl"
+    q.write_text('{"id":"a","question":"what does & do?","answerable":false,"source":"synthetic",'
+                 '"split":"dev"}\n')
+    monkeypatch.setattr("app.cli.build_adapter", lambda *a, **k: SimpleNamespace(total_neurons=0.0))
+    monkeypatch.setattr("app.cli.Searcher", lambda *a, **k: None)
+    monkeypatch.setattr("app.cli.run_retrieval", lambda *a, **k: [])
+    monkeypatch.setattr("app.cli.summarize_retrieval", lambda rows: {})
+    monkeypatch.setattr("app.cli.run_answers", fake_run_answers)
+    with pytest.raises(_Stop):
+        main(["eval", "--answer", "--modes", "hybrid", "--pause", "7", "--data", str(q),
+              "--out", str(tmp_path / "r.json")])
+    assert captured["pause"] == 7.0
