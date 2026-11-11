@@ -217,3 +217,11 @@ def test_help_limits_must_be_positive(tmp_path, key, bad):
 
     with pytest.raises(ValidationError):
         load_config(_variant(tmp_path, lambda d: d["limits"].update({key: bad})))
+
+
+def test_answer_chain_is_gemma_then_groq_without_llama():
+    """llama-3.1-8b was removed (D28): in the 2026-11-11 audit it answered 9 of 60 questions the
+    docs do not cover (gemma 0, Groq 4). A failing chain now ends in the honest 'busy' message."""
+    cfg = load_config(CONFIG)
+    assert cfg.models.answer_order == ["cloudflare:@cf/google/gemma-4-26b-a4b-it",
+                                       "groq:openai/gpt-oss-20b"]

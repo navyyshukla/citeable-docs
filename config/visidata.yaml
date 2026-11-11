@@ -35,7 +35,9 @@ models:
   answer_order:
     - "cloudflare:@cf/google/gemma-4-26b-a4b-it"
     - "groq:openai/gpt-oss-20b"
-    - "cloudflare:@cf/meta/llama-3.1-8b-instruct-fp8"
+  # llama-3.1-8b was removed from the chain (D28): in the 2026-11-11 audit it answered 9 of 60
+  # questions the docs do not cover (gemma 0, Groq 4). Its price and "non_reasoning" entries below
+  # stay so it can be put back (or measured with `eval --provider`) without other changes.
   # Cloudflare neurons per million tokens: [input, output]. Groq is not billed in neurons.
   neurons_per_m_tokens:
     "@cf/google/gemma-4-26b-a4b-it": [9091, 27273]

@@ -23,13 +23,30 @@ def test_chain_follows_config_order_with_per_model_settings():
     with pytest.raises(Exception, match="gemma"):
         adapter.complete("s", "u", cfg.limits.max_completion_tokens)
     hosts = [h for h, _ in bodies]
-    assert hosts == ["api.cloudflare.com", "api.groq.com", "api.cloudflare.com"]
-    gemma, groq, llama = (b for _, b in bodies)
+    assert hosts == ["api.cloudflare.com", "api.groq.com"]  # gemma, then Groq; llama was removed
+    gemma, groq = (b for _, b in bodies)
     assert gemma["chat_template_kwargs"] == {"enable_thinking": False}
     assert gemma["max_tokens"] == cfg.limits.max_completion_tokens_no_thinking
     assert groq["max_completion_tokens"] == cfg.limits.max_completion_tokens
-    assert llama["max_tokens"] == cfg.limits.max_answer_tokens
-    assert "chat_template_kwargs" not in llama
+
+
+def test_a_non_reasoning_model_in_the_chain_is_capped_to_the_answer_budget():
+    """The per-model settings still work for llama if it is ever put back in the chain."""
+    cfg = load_config("config/visidata.yaml")
+    llama = "cloudflare:@cf/meta/llama-3.1-8b-instruct-fp8"
+    cfg = cfg.model_copy(update={"models": cfg.models.model_copy(
+        update={"answer_order": [llama]})})
+    bodies = []
+
+    def handler(req):
+        bodies.append(json.loads(req.content))
+        return httpx.Response(500, json={})
+
+    with pytest.raises(Exception, match="llama"):
+        build_adapter(cfg, ENV, httpx.Client(transport=httpx.MockTransport(handler))).complete(
+            "s", "u", cfg.limits.max_completion_tokens)
+    assert bodies[0]["max_tokens"] == cfg.limits.max_answer_tokens
+    assert "chat_template_kwargs" not in bodies[0]
 
 
 def test_first_provider_answers():

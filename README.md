@@ -33,7 +33,7 @@ What a visitor gets:
  search the docs (keyword + exact key path + meaning search, rank-fused) ─► enough evidence?
         │ no ─► "I couldn't find this" + closest pages (no model call)
         ▼ yes
- answer model (Cloudflare Workers AI, with Groq and a second Cloudflare model as fallbacks)
+ answer model (Cloudflare Workers AI, with Groq as the fallback; if both fail, an honest "busy" message)
         ▼
  output rules enforced: must cite a piece it was given, links limited to the docs' own pages
         ▼
