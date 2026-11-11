@@ -116,3 +116,11 @@ export function cardView(kind, cards) {
     examples: list(c.examples).filter((q) => typeof q === "string" && q.trim() !== ""),
   };
 }
+
+// The model's short reply inside the Help card: plain paragraphs, at most three, each cut at 600
+// characters. The page shows them with textContent only, so nothing here is ever HTML.
+export function helpParagraphs(value) {
+  if (typeof value !== "string") return [];
+  return value.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p !== "")
+    .slice(0, 3).map((p) => p.slice(0, 600));
+}

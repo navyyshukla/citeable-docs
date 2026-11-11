@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resultView, questionState, createBannerState, pageState, startLinks, thinkingText, cardKind, cardView } from "../src/view.js";
+import { resultView, questionState, createBannerState, pageState, startLinks, thinkingText, cardKind, cardView, helpParagraphs } from "../src/view.js";
 
 const CIT = [
   { n: 1, title: "Join › How to join", url: "https://www.visidata.org/docs/join/#how", docs_version: "3.0" },
@@ -179,4 +179,13 @@ test("cardView is null for anything it cannot show", () => {
   assert.equal(cardView("about", { about: { label: "", paragraphs: ["x"] } }), null);
   assert.equal(cardView("about", { about: { label: "L", paragraphs: [] } }), null);
   assert.equal(cardView("about", { about: { label: "L", paragraphs: [3, ""] } }), null);
+});
+
+test("helpParagraphs: plain paragraphs, capped, never HTML", () => {
+  assert.deepEqual(helpParagraphs("One.\n\nTwo."), ["One.", "Two."]);
+  assert.deepEqual(helpParagraphs("  A  \n\n\n\n  B  "), ["A", "B"]);
+  assert.equal(helpParagraphs("a\n\nb\n\nc\n\nd\n\ne").length, 3); // at most three
+  assert.equal(helpParagraphs("x".repeat(700))[0].length, 600); // each cut at 600 characters
+  for (const bad of ["", "   ", "\n\n", null, undefined, 5, {}]) assert.deepEqual(helpParagraphs(bad), []);
+  assert.deepEqual(helpParagraphs('<script>x</script> & "q"'), ['<script>x</script> & "q"']); // literal
 });

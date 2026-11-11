@@ -1,7 +1,7 @@
 // Builds the pieces of the conversation: the visitor's bubble and the answer card. Server text is
 // always put in with textContent; the only innerHTML is the output of the safe renderer
 // (render.js, through view.js).
-import { resultView, cardKind, cardView } from "./view.js";
+import { resultView, cardKind, cardView, helpParagraphs } from "./view.js";
 
 export function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -102,7 +102,12 @@ function buildInfoCard(info) {
 export function buildAnswerCard(result, deps) {
   const kind0 = cardKind(result);
   const info = kind0 ? cardView(kind0, deps && deps.cards) : null;
-  if (info) return buildInfoCard(info);
+  if (info) {
+    // The help card may carry a short model reply; it replaces the fixed paragraphs (as text).
+    const reply = kind0 === "help" ? helpParagraphs(result.text) : [];
+    if (reply.length) info.paragraphs = reply;
+    return buildInfoCard(info);
+  }
   const v = resultView(result);
   const kind = result && (result.status === "answered" || result.status === "abstained")
     ? result.status : "unknown";
