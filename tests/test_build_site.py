@@ -39,7 +39,8 @@ def test_page_has_config_text(built):
 
 
 def test_no_unfilled_placeholders(built):
-    assert "{{" not in built[2] and "}}" not in built[2]
+    # A template marker looks like {{name}}; nested JSON in the page config legitimately has "}}".
+    assert not re.search(r"\{\{\s*[A-Za-z_]+\s*\}\}", built[2])
 
 
 def test_hostile_config_text_is_escaped(tmp_path):
@@ -191,3 +192,33 @@ def test_page_config_carries_the_start_links(tmp_path):
     assert [x["url"] for x in data["start_links"]] == [
         cfg.site.about_url, cfg.site.intro_video_url, cfg.site.getting_started_url]
     assert all(x["url"].startswith("https://") and x["text"] for x in data["start_links"])
+
+
+def _page_config(html):
+    import json
+    return json.loads(re.search(r'id="page-config">(.*?)</script>', html, re.DOTALL).group(1))
+
+
+def test_page_config_carries_the_cards(tmp_path):
+    cfg = load_config(CONFIG)
+    page = load_builder().build_page(cfg, tmp_path).read_text(encoding="utf-8")
+    cards = _page_config(page)["cards"]
+    about, help_ = cards["about"], cards["help"]
+    assert about["label"] == cfg.site.cards.about.label
+    assert about["paragraphs"] == [" ".join(p.split()) for p in cfg.site.cards.about.paragraphs]
+    assert [x["url"] for x in about["links"]] == [
+        cfg.site.about_url, cfg.site.intro_video_url, cfg.site.getting_started_url]
+    assert about["examples"] == []
+    assert help_["links"] == []
+    assert help_["examples"] == cfg.site.starter_questions[:3]
+
+
+def test_hostile_card_text_cannot_close_the_script_block(tmp_path):
+    cfg = load_config(CONFIG)
+    cfg.site.cards.about.label = "</script><script>evil()</script>"
+    cfg.site.cards.about.paragraphs = ["<b>bold</b> & \"quotes\""]
+    page = load_builder().build_page(cfg, tmp_path).read_text(encoding="utf-8")
+    assert "</script><script>evil" not in page and "<script>evil" not in page
+    about = _page_config(page)["cards"]["about"]
+    assert about["label"] == "</script><script>evil()</script>"  # back to the same plain text
+    assert about["paragraphs"] == ['<b>bold</b> & "quotes"']

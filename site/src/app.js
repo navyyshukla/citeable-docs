@@ -108,7 +108,7 @@ async function ask() {
   const slow = setTimeout(() => setThinkingText(thinking, thinkingText(Date.now() - t0)), 3000);
   try {
     const result = await api.ask(token, question);
-    const card = buildAnswerCard(result, { api, getToken: () => token, startLinks: START_LINKS });
+    const card = buildAnswerCard(result, { api, getToken: () => token, startLinks: START_LINKS, cards: config.cards });
     thinking.replaceWith(card);
     showDocsInfo(result);
     scrollTo(card);
@@ -183,14 +183,17 @@ $("ask-form").addEventListener("submit", (e) => {
   e.preventDefault();
   ask();
 });
-document.querySelector(".starters").addEventListener("click", (e) => {
+// Starter and example buttons fill the box only: the visitor decides when to send.
+function fillFromButton(e) {
   const q = e.target instanceof Element ? e.target.closest("[data-question]") : null;
   if (!q) return;
-  box.value = q.dataset.question; // fills the box only: the visitor decides when to send
+  box.value = q.dataset.question;
   updateControls();
   resizeBox();
   box.focus();
-});
+}
+document.querySelector(".starters").addEventListener("click", fillFromButton);
+$("answers").addEventListener("click", fillFromButton); // the help card's example questions
 $("forget").addEventListener("click", (e) => {
   e.preventDefault();
   forgetToken(storage);

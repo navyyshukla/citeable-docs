@@ -1,7 +1,7 @@
 // Builds the pieces of the conversation: the visitor's bubble and the answer card. Server text is
 // always put in with textContent; the only innerHTML is the output of the safe renderer
 // (render.js, through view.js).
-import { resultView } from "./view.js";
+import { resultView, cardKind, cardView } from "./view.js";
 
 export function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -75,7 +75,34 @@ function feedbackBlock(requestId, { api, getToken }) {
   return wrap;
 }
 
+// A fixed card (about / help): label, paragraphs, optional links and clickable examples. Plain
+// text only; no sources and no feedback block.
+function buildInfoCard(info) {
+  const card = el("article", "card card-info");
+  card.append(el("span", "card-label", info.label));
+  for (const p of info.paragraphs) card.append(el("p", null, p));
+  if (info.links.length) {
+    const row = el("div", "links links-card");
+    for (const l of info.links) row.append(link(l.url, l.text));
+    card.append(row);
+  }
+  if (info.examples.length) {
+    const box = el("div", "examples");
+    for (const q of info.examples) {
+      const b = el("button", "starter", q);
+      b.type = "button";
+      b.dataset.question = q;
+      box.append(b);
+    }
+    card.append(box);
+  }
+  return card;
+}
+
 export function buildAnswerCard(result, deps) {
+  const kind0 = cardKind(result);
+  const info = kind0 ? cardView(kind0, deps && deps.cards) : null;
+  if (info) return buildInfoCard(info);
   const v = resultView(result);
   const kind = result && (result.status === "answered" || result.status === "abstained")
     ? result.status : "unknown";

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resultView, questionState, createBannerState, pageState, startLinks, thinkingText } from "../src/view.js";
+import { resultView, questionState, createBannerState, pageState, startLinks, thinkingText, cardKind, cardView } from "../src/view.js";
 
 const CIT = [
   { n: 1, title: "Join › How to join", url: "https://www.visidata.org/docs/join/#how", docs_version: "3.0" },
@@ -141,4 +141,42 @@ test("each banner kind keeps its own slot: an error or a waking note never erase
   assert.equal(b.current().message, "Newer warning text");
   b.hide();
   assert.equal(b.current(), null);
+});
+
+test("cardKind: only a card reply with a known kind", () => {
+  assert.equal(cardKind({ status: "card", kind: "about" }), "about");
+  assert.equal(cardKind({ status: "card", kind: "help" }), "help");
+  for (const bad of [{ status: "card" }, { status: "card", kind: "x" }, { status: "card", kind: 5 },
+    { status: "answered", kind: "about" }, null, undefined, "card", 7]) {
+    assert.equal(cardKind(bad), null);
+  }
+});
+
+const CARDS = {
+  about: {
+    label: "About VisiData",
+    paragraphs: ["VisiData is <b>a</b> tool & more."],
+    links: [{ text: "Site", url: "https://www.visidata.org" }, { text: "bad", url: "javascript:x" }],
+    examples: [],
+  },
+  help: { label: "What I can do", paragraphs: ["p1", "p2"], links: [], examples: ["Q one?", "", 5, "Q two?"] },
+};
+
+test("cardView builds the card from config and keeps text as plain strings", () => {
+  const a = cardView("about", CARDS);
+  assert.equal(a.label, "About VisiData");
+  assert.deepEqual(a.paragraphs, ["VisiData is <b>a</b> tool & more."]); // text only: never HTML
+  assert.deepEqual(a.links, [{ text: "Site", url: "https://www.visidata.org" }]);
+  assert.deepEqual(a.examples, []);
+  const h = cardView("help", CARDS);
+  assert.deepEqual(h.examples, ["Q one?", "Q two?"]);
+});
+
+test("cardView is null for anything it cannot show", () => {
+  assert.equal(cardView("other", CARDS), null);
+  assert.equal(cardView("about", undefined), null);
+  assert.equal(cardView("about", {}), null);
+  assert.equal(cardView("about", { about: { label: "", paragraphs: ["x"] } }), null);
+  assert.equal(cardView("about", { about: { label: "L", paragraphs: [] } }), null);
+  assert.equal(cardView("about", { about: { label: "L", paragraphs: [3, ""] } }), null);
 });

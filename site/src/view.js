@@ -92,3 +92,27 @@ export function thinkingText(elapsedMs) {
     ? "Still working… the server may be waking up, which can take up to 30 seconds."
     : "Searching the docs…";
 }
+
+// The fixed cards ("what is VisiData?", "what can you do?"). The API says only which one; the
+// text comes from the page's own config and is always shown as plain text.
+const CARD_KINDS = ["about", "help"];
+
+export function cardKind(result) {
+  if (!result || typeof result !== "object" || result.status !== "card") return null;
+  return CARD_KINDS.includes(result.kind) ? result.kind : null;
+}
+
+export function cardView(kind, cards) {
+  if (!CARD_KINDS.includes(kind) || !cards || typeof cards !== "object") return null;
+  const c = cards[kind];
+  if (!c || typeof c !== "object") return null;
+  const label = text(c.label);
+  const paragraphs = list(c.paragraphs).filter((p) => typeof p === "string" && p.trim() !== "");
+  if (label === "" || paragraphs.length === 0) return null;
+  return {
+    label,
+    paragraphs,
+    links: startLinks(c.links),
+    examples: list(c.examples).filter((q) => typeof q === "string" && q.trim() !== ""),
+  };
+}

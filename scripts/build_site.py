@@ -43,6 +43,15 @@ def build_page(cfg: Config, out_dir: Path) -> Path:
         start_links.append({"text": "▶ Intro video", "url": cfg.site.intro_video_url})
     if cfg.site.getting_started_url:
         start_links.append({"text": "Getting started guide ↗", "url": cfg.site.getting_started_url})
+    cards = {}
+    for name in ("about", "help"):
+        c = getattr(cfg.site.cards, name)
+        cards[name] = {
+            "label": c.label,
+            "paragraphs": [" ".join(par.split()) for par in c.paragraphs],
+            "links": start_links if c.links else [],
+            "examples": cfg.site.starter_questions[:STARTERS_SHOWN] if c.examples else [],
+        }
     values = {
         "title": esc(cfg.site.title),
         "brand": esc(cfg.site.brand),
@@ -58,6 +67,7 @@ def build_page(cfg: Config, out_dir: Path) -> Path:
             "api_base_url": cfg.site.api_base_url,
             "max_question_chars": cfg.limits.max_question_chars,
             "start_links": start_links,  # shown under a refused question (page script filters them)
+            "cards": cards,  # the fixed about/help cards; the API sends only which one to show
         }),
     }
     page = (SITE / "template.html").read_text(encoding="utf-8")
