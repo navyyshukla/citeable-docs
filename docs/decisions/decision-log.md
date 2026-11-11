@@ -158,3 +158,18 @@ Dates: decided 2026-10-13 to 2026-10-15. To be split into one file per decision 
 - **Departure from the plan:** local page development uses the `DEV_CORS_ORIGIN` environment variable instead of editing `api.cors_origins`, so the production list never changes and nothing has to be removed before the beta.
 - **Alternatives:** host the page on Render with the API (cold start blocks the page itself); a single public eval page that includes friends' questions (rejected on privacy); a model-written `/evals` summary (rejected: numbers must come from code).
 - **Open:** Pages must be enabled by the owner (Settings -> Pages -> Source: GitHub Actions); live check of the page against the API is partly done.
+
+## D25. Chat page redesign: warm paper, chat-style feed, a link instead of an embedded video (2026-11-11)
+- **Design doc:** `docs/superpowers/specs/2026-11-11-chat-page-redesign-design.md` (mockup beside it); built as Plan 3c (`docs/superpowers/plans/2026-11-11-plan-3c-chat-page-redesign.md`, 5 tasks, native execution on branch `plan-3c`).
+- **Why:** the live check showed the page worked but looked like a plain form. Friends who have never heard of VisiData open it on a phone or laptop and it has to feel like the chat apps they know (owner, 2026-11-11: it should say "a nice, fun chatbot, built for VisiData, answers only about VisiData", with a place to learn what VisiData is).
+- **Owner's choices:** warm paper look; a dark mode; both computer and phone layouts designed; even buttons (one recipe) and equal-size starter cards; a bigger, centred typing box; links to visidata.org and to an intro video; the line "Answers only from the VisiData docs".
+- **Calls (builder, owner can override):**
+  - Dark mode starts from the device setting; a moon/sun button flips it and remembers the choice on that device (`localStorage`, wrapped so blocked storage still works). A tiny external script in `<head>` applies it before first paint, so no inline script is needed and the content-security rules stay exactly as built.
+  - `/evals` follows the device setting only (no script, no button); a visitor who picked light on the chat page may see a dark `/evals`. Accepted.
+  - The video is a link, never an embedded player: an embed loads third-party code, which would break the no-third-party rule. `intro_video_url` is optional config; no official URL is confirmed yet, so the button is left out until the owner supplies one.
+  - Chronological feed with the visitor's bubble on the right; Enter sends on a computer, Shift+Enter adds a line, on touch Enter adds a line; Ctrl/Cmd+Enter always sends; the box grows to about 8 lines.
+  - The light accent is `#a8472a`, not the mockup's `#c4623c`: the mockup colour is 3.7:1 as link text and fails the 4.5:1 reading bar. Every text pair is tested in both themes.
+- **Alternatives:** an embedded video player (rejected: third-party code); a theme button only, with no device setting (rejected: a dark-mode device would flash light); a single shared stylesheet scope (rejected: chat rules are all scoped to `body.chat` so `/evals` gets only the palette).
+- **Unchanged on purpose:** the answer renderer and its hostile-input tests, token handling, banner kinds, request timeout, API and stored data.
+- **Open:** the intro-video URL; the live check against a real server (see CLAUDE.md for whether it was done).
+

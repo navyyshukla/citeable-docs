@@ -63,6 +63,24 @@ Build a copy of the page whose `site.api_base_url` points at the local API (a te
 file; never commit it). Create a throwaway invite with `token create --label <name>`, open the
 printed link, and revoke the token afterwards. Production never sets `DEV_CORS_ORIGIN`.
 
+### Page text and links (config keys)
+
+The opening screen's text lives in `config/visidata.yaml` under `site:`: `brand` (top bar),
+`greeting`, `tagline` (one plain sentence for newcomers) and `about_url` (the "What is VisiData?"
+link) are required; `intro_video_url` is optional and the "Intro video" button is simply left out
+when it is not set. Both URLs must start with `https://` and contain no spaces or quote characters
+(the build refuses anything else). The welcome screen shows the first three `starter_questions`.
+The old `intro` key is gone.
+
+### Previewing the page and the themes
+
+After `python scripts/build_site.py page --out _site`, serve `_site` as above and open it. Dark mode
+follows the device setting; the moon/sun button in the top bar flips it and remembers the choice
+in that browser only. To see both themes without changing the device setting, press the button, or
+(in the browser console) set `document.documentElement.dataset.theme = "dark"` or `"light"`.
+`/evals` follows the device setting only (no button). A browser may keep an old copy of the page's
+script files while you iterate: use a private window or serve with a no-cache header.
+
 ## Enabling Pages (owner action, once)
 
 The page is a static site on GitHub Pages, deployed by `.github/workflows/pages.yml` on pushes to
