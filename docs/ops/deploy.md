@@ -89,6 +89,18 @@ with status `card` and count against the daily caps. To re-check the classifier 
 descriptions or the prompt: `python -m evals.cards_eval run --out evals/results/cards-<date>.json`
 (about 90 neurons; read the score with `... score --in <file>`; the bar is 0 false cards and 90% right).
 
+### The help card's fact sheet
+
+`site.cards.help.facts` (1 to 10 plain sentences) is everything the model may use when it answers a
+question about the assistant ("why can't you answer outside VisiData?", "can I know more about
+you?"). To let it answer more questions, add true facts there; to stop it saying something, remove
+the fact. If the facts do not cover a question, or the reply is unusable (a link, a list, code, over
+900 characters, an error), the visitor sees the fixed paragraphs of the card instead.
+`limits.help_max_tokens` (200) and `limits.help_timeout_seconds` (20) bound that one call. Logged
+rows: `answer_text` is `card:help+model: <reply>` when the model answered, `card:help` otherwise.
+To read what it says after changing the facts or the prompt: `python -m evals.help_eval run --out
+evals/results/help-<date>.json` (15 questions, about 60 neurons) and read every reply.
+
 ### Previewing the page and the themes
 
 After `python scripts/build_site.py page --out _site`, serve `_site` as above and open it. Dark mode
