@@ -56,6 +56,17 @@ class QuestionRow:
 
 
 @dataclass(frozen=True)
+class Section:
+    """An extra block on the page: a title, how its questions were labelled, stats, plain notes
+    and plain lines (see evals.report_sets)."""
+    title: str
+    labelling: str
+    stats: list[Stat]
+    notes: list[str]
+    lines: list[str]
+
+
+@dataclass(frozen=True)
 class Report:
     headline: list[Stat]
     honesty: list[str]
@@ -63,6 +74,7 @@ class Report:
     history: list[RunRow]
     rows: list[QuestionRow]
     generated: list[Stat] = field(default_factory=list)  # stats for the generated-question runs
+    sections: list[Section] = field(default_factory=list)  # added test sets (evals.report_sets)
 
 
 def _answer_rows(run: dict) -> list[dict]:
@@ -237,6 +249,19 @@ def _stat_li(s: Stat) -> str:
             f"<strong>{fraction_text(s.k, s.n)}</strong>{rng}</li>")
 
 
+def _section_html(s: Section) -> str:
+    esc = html.escape
+    parts = [f"<section><h2>{esc(s.title)}</h2><p>{esc(s.labelling)}</p>"]
+    if s.stats:
+        parts.append("<ul>" + "".join(_stat_li(x) for x in s.stats) + "</ul>")
+    if s.lines:
+        parts.append("<ul>" + "".join(f"<li>{esc(t)}</li>" for t in s.lines) + "</ul>")
+    if s.notes:
+        parts.append("<ul>" + "".join(f"<li><small>{esc(t)}</small></li>" for t in s.notes) + "</ul>")
+    parts.append("</section>")
+    return "".join(parts)
+
+
 def _link(title: str, url: str) -> str:
     t = html.escape(title)
     if url.startswith(("https://", "http://")):
@@ -282,6 +307,7 @@ def render_evals_html(report: Report, cfg: Config) -> str:
                + "".join(_stat_li(s) for s in report.headline) + "</ul></section>")
     out.append("<section><h2>How much to trust these numbers</h2><ul>"
                + "".join(f"<li>{esc(t)}</li>" for t in report.honesty) + "</ul></section>")
+    out.extend(_section_html(s) for s in report.sections)
     out.append("<section><h2>Known wrong answers</h2>")
     if report.known_wrong:
         out.append("<ul>" + "".join(f"<li><strong>{esc(i)}</strong>: {esc(t)}</li>"
