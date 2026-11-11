@@ -43,6 +43,8 @@ class LimitsCfg(_Strict):
     max_completion_tokens_no_thinking: int = 1000
     global_daily_cap: int = 150
     per_visitor_daily_cap: int = 10
+    # Reply budget for the one-word question classifier (it must stop on its own inside this).
+    classifier_max_tokens: int = 16
     # Cloudflare's free allowance is 10,000 neurons/day; leave room for evals and the fallback.
     global_daily_neurons: float = 8000
     retention_days: int = 30
@@ -65,6 +67,27 @@ class ApiCfg(_Strict):
     cors_origins: list[str]
 
 
+class CardCfg(_Strict):
+    """A fixed card shown for questions like "what is VisiData?" (text lives here, not in code)."""
+    label: str = Field(min_length=1)
+    description: str = Field(min_length=1)  # tells the classifier which questions belong here
+    paragraphs: list[str] = Field(min_length=1, max_length=4)
+    links: bool = False  # show the start-here links (website, intro video, Getting Started)
+    examples: bool = False  # show the first starter questions as clickable examples
+
+    @field_validator("paragraphs")
+    @classmethod
+    def _paragraphs_not_blank(cls, v):
+        if any(not p.strip() for p in v):
+            raise ValueError("a card paragraph must not be blank")
+        return v
+
+
+class CardsCfg(_Strict):
+    about: CardCfg
+    help: CardCfg
+
+
 class SiteCfg(_Strict):
     """The public chat page. Text lives here, not in code (project specifics are config)."""
     url: str  # where the page is served; the invite link is built from it
@@ -77,6 +100,7 @@ class SiteCfg(_Strict):
     intro_video_url: str | None = None  # optional; the link is left out when unset
     getting_started_url: str | None = None  # optional; shown to visitors whose question was refused
     starter_questions: list[str] = Field(min_length=1, max_length=6)
+    cards: CardsCfg
     privacy_notice: str
     # eval question id -> a note shown on /evals for answers that are wrong because of the docs
     known_wrong: dict[str, str] = {}

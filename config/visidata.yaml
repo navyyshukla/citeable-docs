@@ -22,6 +22,7 @@ limits:
   max_completion_tokens_no_thinking: 1000
   global_daily_cap: 150
   per_visitor_daily_cap: 10
+  classifier_max_tokens: 16
   global_daily_neurons: 8000
   retention_days: 30
 models:
@@ -61,6 +62,26 @@ site:
     - How can I convert a CSV file to another file type?
     - How do I make a frequency table of a column?
     - What does the ! key do to a column?
+  cards:
+    about:
+      label: "About VisiData · written by us, not from the docs"
+      description: "asks what VisiData is, or how to get started with it"
+      paragraphs:
+        - >-
+          VisiData is a free tool that runs in the terminal and works like a spreadsheet for data
+          files such as CSV. You drive it with the keyboard and can explore a file quickly.
+      links: true
+    help:
+      label: "What I can do"
+      description: "asks what this assistant can do, or how to use the assistant itself"
+      paragraphs:
+        - >-
+          I answer how-to questions about VisiData using only its documentation, and I show you
+          which pages I used. I don't remember your earlier question, so ask each one in full.
+        - >-
+          I can't answer anything outside VisiData, and I can make mistakes: check the linked
+          page.
+      examples: true
   privacy_notice: >-
     Your question and the answer are kept for 30 days, then deleted. Only the owner reads
     questions. To answer, the text of your question is sent to Cloudflare and Groq (the AI

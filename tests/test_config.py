@@ -155,3 +155,36 @@ def test_intro_key_is_gone(tmp_path):
 
 def test_getting_started_url_is_optional_and_shipped():
     assert load_config(CONFIG).site.getting_started_url == "https://www.visidata.org/docs/"
+
+
+def test_cards_are_required_and_strict(tmp_path):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["site"].pop("cards")))
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["site"]["cards"].pop("about")))
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: d["site"]["cards"]["help"].update(surprise="x")))
+
+
+@pytest.mark.parametrize("change", [
+    lambda c: c["about"].update(label=""),
+    lambda c: c["about"].update(description=""),
+    lambda c: c["about"].update(paragraphs=[]),
+    lambda c: c["about"].update(paragraphs=["ok", "   "]),
+    lambda c: c["about"].update(paragraphs=["a", "b", "c", "d", "e"]),
+])
+def test_card_text_must_not_be_empty(tmp_path, change):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        load_config(_variant(tmp_path, lambda d: change(d["site"]["cards"])))
+
+
+def test_shipped_cards_and_classifier_limit():
+    cfg = load_config(CONFIG)
+    assert cfg.site.cards.about.links is True and cfg.site.cards.about.examples is False
+    assert cfg.site.cards.help.examples is True and cfg.site.cards.help.links is False
+    assert cfg.site.cards.about.description and cfg.site.cards.help.description
+    assert cfg.limits.classifier_max_tokens == 16
