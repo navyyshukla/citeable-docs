@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
 from app.answer import Citation, answer_question, validate_question
+from app.classify import classify_question
 from app.config import Config
 from app.db import DbUnavailable
 from app.llm.base import Adapter, AllProvidersFailed, ProviderError
@@ -38,6 +39,7 @@ class AskResult:
     docs_ref: str | None = None
     docs_version: str | None = None
     last_updated: str | None = None
+    kind: str | None = None  # which fixed card, when status == "card"
 
 
 @dataclass
@@ -119,11 +121,16 @@ class AnswerService:
         rid = res.request_id
         index = adapter = None
         try:
+            # A new adapter per request: its call and neuron counters are per request, and
+            # requests run in parallel threads. The classifier and the answer share it, so the
+            # neuron total and the call count cover both.
+            adapter = self.make_adapter()
+            kind = classify_question(q, adapter, self.cfg)
+            classifier_calls = adapter.calls_made
+            if kind != "normal":  # a fixed card: no search, no answer call, no docs index needed
+                return self._card_reply(rid, kind, adapter)
             index = self._load_index()
             hits = index.searcher.search("hybrid", q, self.cfg.search.top_k)
-            # A new adapter per request: its call and neuron counters are per request, and
-            # requests run in parallel threads.
-            adapter = self.make_adapter()
             a = answer_question(q, hits, index.by_id, adapter, self.cfg, self.cfg.project.name,
                                 self.cfg.search.evidence_threshold)
         except AskError as e:
@@ -146,12 +153,23 @@ class AnswerService:
                 citations=[asdict(c) for c in a.citations], top_score=a.top_score,
                 provider=a.provider, model=a.model,
                 neurons=adapter.total_neurons if adapter.calls_made else None,
-                llm_calls=a.llm_calls, seconds=a.seconds, docs_ref=index.docs_ref, error=None,
+                llm_calls=a.llm_calls + classifier_calls, seconds=a.seconds, docs_ref=index.docs_ref, error=None,
                 retrieved_ids=[h.piece_id for h in hits])
         except DbUnavailable:
             pass  # the answer exists and its neurons are spent: return it; the row stays reserved
         return AskResult(rid, a.status, a.text, a.citations, a.closest, index.docs_ref,
                          index.docs_version, index.last_updated)
+
+    def _card_reply(self, request_id: str, kind: str, adapter: Adapter) -> AskResult:
+        try:
+            self.usage.finish(
+                request_id, status="card", answer_text=f"card:{kind}", citations=[],
+                top_score=None, provider=None, model=None,
+                neurons=adapter.total_neurons if adapter.calls_made else None,
+                llm_calls=adapter.calls_made, seconds=None, docs_ref=None, error=None)
+        except DbUnavailable:
+            pass  # the reply is free of the database: return it; the row stays reserved
+        return AskResult(request_id, "card", "", kind=kind)
 
     def _log_error(self, request_id: str, error: str, index: _Index | None,
                    adapter: Adapter | None) -> None:

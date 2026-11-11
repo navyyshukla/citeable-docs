@@ -16,11 +16,14 @@ class FakeService:
     def __init__(self):
         self.asked, self.feedbacks = [], []
         self.raises: Exception | None = None
+        self.card_kind: str | None = None
 
     def ask(self, token, question):
         self.asked.append((token, question))
         if self.raises:
             raise self.raises
+        if self.card_kind:
+            return AskResult("rid-2", "card", "", [], [], None, None, None, kind=self.card_kind)
         c = Citation(1, "Join › How", "https://www.visidata.org/docs/join/", "3.0", "2026-01-01")
         return AskResult("rid-1", "answered", "It joins [1].", [c], [c], "stable@abc", "3.0",
                          "2026-01-01")
@@ -195,3 +198,15 @@ def test_dev_cors_origin_env_adds_exactly_one_origin(monkeypatch):
     assert _allowed(c, GOOD) == GOOD
     assert _allowed(c, "http://localhost:9999") is None
     assert _allowed(c, BAD) is None
+
+
+def test_card_reply_shape(client, svc):
+    svc.card_kind = "about"
+    body = client.post("/ask", json={"question": "what is visidata"}, headers=auth()).json()
+    assert body["status"] == "card" and body["kind"] == "about" and body["text"] == ""
+    assert body["citations"] == [] and body["closest"] == []
+
+
+def test_answered_reply_has_no_kind(client, svc):
+    body = client.post("/ask", json={"question": "what does & do?"}, headers=auth()).json()
+    assert body["status"] == "answered" and body["kind"] is None

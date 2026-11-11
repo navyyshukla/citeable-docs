@@ -20,14 +20,14 @@ from app.db import Db
 _LOCK_KEY = 7001  # advisory lock that serialises cap checks
 # A 'reserved' row that never finished (the process died mid-request) stops counting after this.
 _RESERVED_GRACE = "5 minutes"
-# What counts against a cap: answered and abstained questions, questions still in flight, and
+# What counts against a cap: answered, abstained and card replies, questions still in flight, and
 # failed questions that still burned neurons (else one visitor could drain the shared budget with
 # prompts that overrun the token cap). A failed question that burned nothing is free.
-_COUNTS = f"""(status IN ('answered', 'abstained')
+_COUNTS = f"""(status IN ('answered', 'abstained', 'card')
                OR (status = 'reserved' AND created_at > now() - interval '{_RESERVED_GRACE}')
                OR (status = 'error' AND COALESCE(neurons, 0) > 0))"""
 # The shared request cap stays friendlier: failed questions are free there.
-_COUNTS_GLOBAL = f"""(status IN ('answered', 'abstained')
+_COUNTS_GLOBAL = f"""(status IN ('answered', 'abstained', 'card')
                OR (status = 'reserved' AND created_at > now() - interval '{_RESERVED_GRACE}'))"""
 _TOKEN_SHAPE = re.compile(r"[A-Za-z0-9_-]{43}")  # what secrets.token_urlsafe(32) produces
 
@@ -170,7 +170,7 @@ class Usage:
             ).fetchone()
         return Reservation(str(rid))
 
-    def finish(self, request_id: str, *, status: Literal["answered", "abstained", "error"],
+    def finish(self, request_id: str, *, status: Literal["answered", "abstained", "card", "error"],
                answer_text: str | None, citations: list[dict], top_score: float | None,
                provider: str | None, model: str | None, neurons: float | None, llm_calls: int,
                seconds: float | None, docs_ref: str | None, error: str | None,

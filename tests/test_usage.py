@@ -259,3 +259,13 @@ def test_failed_questions_that_burned_nothing_stay_free(usage):
         r = reserve(usage, a, per_visitor=1)
         assert isinstance(r, Reservation)
         finish(usage, r.request_id, status="error", neurons=neurons, answer=None)
+
+
+def test_card_status_counts_against_visitor_and_global_caps(usage):
+    tid = usage.token_id_for(usage.create_token("t-ann"))
+    r = reserve(usage, tid, per_visitor=1)
+    finish(usage, r.request_id, status="card", neurons=2.0, answer="card:about")
+    hit = reserve(usage, tid, per_visitor=1)
+    assert isinstance(hit, CapHit) and hit.kind == "visitor"
+    hit = reserve(usage, tid, global_cap=1)
+    assert isinstance(hit, CapHit) and hit.kind == "global"

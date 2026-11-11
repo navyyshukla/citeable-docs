@@ -74,7 +74,7 @@ def _result_json(r: AskResult, notice: str) -> dict:
             "citations": [asdict(c) for c in r.citations],
             "closest": [asdict(c) for c in r.closest],
             "docs_ref": r.docs_ref, "docs_version": r.docs_version,
-            "last_updated": r.last_updated, "notice": notice}
+            "last_updated": r.last_updated, "kind": r.kind, "notice": notice}
 
 
 def create_app(service: AnswerService, cfg: Config) -> FastAPI:

@@ -71,14 +71,29 @@ class FakeStore:
 
 
 class Fake:
+    """Answers the classifier prompt with `label` and every other prompt with `text`."""
     name = "fake"
 
-    def __init__(self, text="It joins sheets [1]."):
-        self.text, self.calls = text, 0
+    def __init__(self, text="It joins sheets [1].", label="normal"):
+        self.text, self.label = text, label
+        self.calls = self.answer_calls = 0
 
     def complete(self, system, user, max_tokens):
         self.calls += 1
+        if "exactly one word" in system:
+            return Completion(self.label, "fake", "m", 50, 2, 2.5, 0.1)
+        self.answer_calls += 1
         return Completion(self.text, "fake", "m", 100, 20, 2.5, 0.1)
+
+
+class FlakyFirst(Fake):
+    """The first call (the classifier) fails; later calls work."""
+
+    def complete(self, system, user, max_tokens):
+        if self.calls == 0:
+            self.calls += 1
+            raise ProviderError("503", 503)
+        return super().complete(system, user, max_tokens)
 
 
 class Down:
@@ -136,8 +151,8 @@ def test_happy_path_logs_answer_and_citations():
     assert r.docs_ref == "stable@abc1234567" and r.docs_version == "3.0"
     rid, kw = usage.finished[0]
     assert rid == r.request_id and kw["status"] == "answered"
-    assert kw["citations"][0]["url"].endswith("/join/") and kw["llm_calls"] == 1
-    assert kw["neurons"] == 2.5 and kw["provider"] == "fake" and kw["docs_ref"] == r.docs_ref
+    assert kw["citations"][0]["url"].endswith("/join/") and kw["llm_calls"] == 2
+    assert kw["neurons"] == 5.0 and kw["provider"] == "fake" and kw["docs_ref"] == r.docs_ref
     token_id, question, per_visitor, global_cap, budget = usage.reserved[0]
     assert (per_visitor, global_cap) == (CFG.limits.per_visitor_daily_cap,
                                          CFG.limits.global_daily_cap)
@@ -156,8 +171,8 @@ def test_below_threshold_abstains_without_adapter_call():
     store = FakeStore(vector_hits=(("rows:0", 0.5),))  # found by one search only: 1/61
     svc, usage, _, provider, made = make(store=store)
     r = svc.ask("good", "zzzz nothing")
-    assert r.status == "abstained" and provider.calls == 0
-    assert usage.finished[0][1]["status"] == "abstained" and usage.finished[0][1]["llm_calls"] == 0
+    assert r.status == "abstained" and provider.answer_calls == 0  # no answer call, only the classifier
+    assert usage.finished[0][1]["status"] == "abstained" and usage.finished[0][1]["llm_calls"] == 1
 
 
 def test_all_providers_failed_is_503_and_logged_as_error():
@@ -239,7 +254,8 @@ def test_neurons_burned_by_failed_attempts_are_logged_for_the_neuron_cap():
     with pytest.raises(AskError):
         svc.ask("good", "what does & do?")
     kw = usage.finished[0][1]
-    assert kw["status"] == "error" and kw["neurons"] == 40.0 and kw["llm_calls"] == 1
+    # the classifier call burned 40 and failed open to "normal"; the answer call burned 40 more
+    assert kw["status"] == "error" and kw["neurons"] == 80.0 and kw["llm_calls"] == 2
 
 
 def test_version_needs_no_database_and_shows_docs_ref_once_loaded():
@@ -273,8 +289,9 @@ def test_neurons_of_failed_fallbacks_count_when_a_later_provider_answers():
                         embed_query=lambda t: [0.0])
     svc.ask("good", "what does & do?")
     kw = usage.finished[0][1]
-    assert kw["status"] == "answered" and kw["llm_calls"] == 2
-    assert kw["neurons"] == pytest.approx(42.5)  # 40 burned by the failure + 2.5 by the answer
+    # each of the two model calls (classifier, answer) first hit the cut-off provider, then Fake
+    assert kw["status"] == "answered" and kw["llm_calls"] == 4
+    assert kw["neurons"] == pytest.approx(85.0)  # 2 x (40 burned by the failure + 2.5 by the reply)
 
 
 @pytest.mark.parametrize("question", ["a\x00b", "\ud800", "ok \udfff"])
@@ -322,3 +339,51 @@ def test_the_service_demands_an_ingest_meta_row_before_serving():
     svc, usage, store, *_ = make()
     svc.ask("good", "what does & do?")
     assert store.required is True
+
+
+def test_card_question_returns_a_card_without_search():
+    svc, usage, store, provider, _ = make(provider=Fake(label="about"))
+    r = svc.ask("good", "what is visidata")
+    assert r.status == "card" and r.kind == "about" and r.text == ""
+    assert r.citations == [] and r.closest == []
+    assert store.loads == 0  # a card never loads the docs index, even on a cold server
+    assert provider.calls == 1 and provider.answer_calls == 0
+
+
+def test_card_row_is_logged():
+    svc, usage, *_ = make(provider=Fake(label="help"))
+    r = svc.ask("good", "what can you do?")
+    rid, kw = usage.finished[0]
+    assert rid == r.request_id and kw["status"] == "card" and kw["answer_text"] == "card:help"
+    assert kw["llm_calls"] == 1 and kw["neurons"] == 2.5 and kw["citations"] == []
+    assert kw.get("retrieved_ids") is None and kw["error"] is None
+
+
+def test_classifier_failure_falls_through_to_the_normal_answer():
+    svc, usage, _, provider, _ = make(provider=FlakyFirst())
+    r = svc.ask("good", "what does & do?")
+    assert r.status == "answered" and r.kind is None
+    assert usage.finished[0][1]["llm_calls"] == 2
+
+
+def test_all_providers_down_is_the_usual_503_message():
+    svc, usage, *_ = make(provider=Down())
+    with pytest.raises(AskError) as e:
+        svc.ask("good", "what does & do?")
+    assert e.value.status == 503 and e.value.message == "The answer models are busy. Try again in a minute."
+    assert usage.finished[0][1]["status"] == "error"  # the classifier error never reaches the visitor
+
+
+def test_normal_question_logs_classifier_and_answer_together():
+    svc, usage, *_ = make()
+    svc.ask("good", "what does & do?")
+    kw = usage.finished[0][1]
+    assert kw["llm_calls"] == 2 and kw["neurons"] == 5.0  # the neuron cap sees the true spend
+
+
+def test_cap_hit_stops_before_the_classifier_runs():
+    resets = datetime.now(timezone.utc) + timedelta(hours=3)
+    svc, _, _, provider, _ = make(usage=FakeUsage(cap=CapHit("visitor", resets)))
+    with pytest.raises(AskError):
+        svc.ask("good", "what is visidata")
+    assert provider.calls == 0
