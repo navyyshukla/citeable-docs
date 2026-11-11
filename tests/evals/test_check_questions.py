@@ -94,3 +94,12 @@ def test_packets_hold_page_text_but_only_in_the_file_asked_for(tmp_path):
     qf = tmp_path / "q.jsonl"
     qf.write_text(q(1).model_dump_json() + "\n", encoding="utf-8")
     assert BODY not in qf.read_text(encoding="utf-8") and load_questions(qf)
+
+
+def test_packets_print_each_page_once_with_all_its_questions(tmp_path):
+    pieces = [piece("join", 0), piece("rows", 0)]
+    f = write_packets([q(1), q(2), q(3, "rows")], pieces, tmp_path / "p.md")
+    text = f.read_text(encoding="utf-8")
+    assert text.count(f"{BODY} join 0") == 1 and text.count(f"{BODY} rows 0") == 1
+    assert all(i in text for i in ("h-001", "h-002", "h-003"))
+    assert text.index("h-001") > text.index(f"{BODY} join 0")  # questions come after their page

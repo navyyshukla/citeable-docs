@@ -89,11 +89,16 @@ def keep_both(questions: list[EvalQuestion], first: list[dict], second: list[dic
 
 
 def write_packets(questions: list[EvalQuestion], pieces: list[Piece], path: Path) -> Path:
-    """A local text file for a second reader: each question next to its page. NOT committed."""
+    """A local text file for a second reader: each docs page once, then the questions written
+    from it. NOT committed (it contains docs text)."""
     lines = ["# Question check packets (local file: contains docs text, do not commit)", ""]
-    for q in questions:
-        lines += [f"## {q.id}", f"Question: {q.question}", f"Written from page: {q.gold_page}", "",
-                  _page_text(q.gold_page or "", pieces), "", "---", ""]
+    pages = list(dict.fromkeys(q.gold_page or "" for q in questions))
+    for page in pages:
+        lines += [f"# PAGE: {page}", "", _page_text(page, pieces), "", "## Questions written from this page"]
+        for q in questions:
+            if (q.gold_page or "") == page:
+                lines.append(f"- {q.id}: {q.question}")
+        lines += ["", "=" * 60, ""]
     Path(path).write_text("\n".join(lines), encoding="utf-8")
     return Path(path)
 
