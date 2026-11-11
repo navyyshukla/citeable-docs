@@ -30,7 +30,7 @@ Draft text, for the owner to rewrite. **(call)** Everything below lives in `conf
 
 Known costs, stated so the owner can check them after the build (estimates until measured):
 
-- One extra model call per question: about 1 to 3 seconds of waiting and roughly 1 to 3 neurons, against about 400 neurons for a full answer (under 1%).
+- One extra model call per question: about 1 to 3 seconds of waiting and roughly 1.5 neurons. **Correction (live check, 2026-11-11):** a full answer costs about 15 to 19 neurons, not the 400 first written here (400 was one whole 28-question eval run), so the classifier adds about 8 to 10% to every normal question.
 - A classifier can be wrong. The dangerous direction is a real how-to question sent to a card, which hides an answer the assistant could have given. That is why the evaluation below has a hard bar on it.
 - Each call sends the visitor's question to the same providers as the answer path, so the privacy notice does not change.
 
