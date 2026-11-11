@@ -185,7 +185,7 @@ test("helpParagraphs: plain paragraphs, capped, never HTML", () => {
   assert.deepEqual(helpParagraphs("One.\n\nTwo."), ["One.", "Two."]);
   assert.deepEqual(helpParagraphs("  A  \n\n\n\n  B  "), ["A", "B"]);
   assert.equal(helpParagraphs("a\n\nb\n\nc\n\nd\n\ne").length, 3); // at most three
-  assert.equal(helpParagraphs("x".repeat(700))[0].length, 600); // each cut at 600 characters
+  assert.equal(helpParagraphs("x".repeat(1200))[0].length, 900); // each cut at 900, the most the server allows
   for (const bad of ["", "   ", "\n\n", null, undefined, 5, {}]) assert.deepEqual(helpParagraphs(bad), []);
   assert.deepEqual(helpParagraphs('<script>x</script> & "q"'), ['<script>x</script> & "q"']); // literal
 });

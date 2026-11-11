@@ -179,3 +179,9 @@ def test_phone_bar_wraps_so_the_links_get_their_own_row():
     row = [b for sel, b, phone in rules_for(".links-top") if phone and "chatting" in sel]
     assert row and re.search(r"flex-basis\s*:\s*100%", row[0])
     assert re.search(r"order\s*:\s*3", row[0]), "the name and the theme button must share the first row"
+
+
+def test_card_paragraphs_wrap_long_words():
+    """Card text can now be model text: a long unbroken word must not widen the page."""
+    found = [b for sel, b, _ in chat_rules() if sel.strip() == ".chat .card-info p"]
+    assert found and re.search(r"overflow-wrap\s*:\s*anywhere", found[0])

@@ -166,7 +166,7 @@ body.chat { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction
   to { opacity: 1; transform: none; }
 }
 .chat .card-label { display: inline-block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-.chat .card-info p { margin: 0 0 0.6em; }
+.chat .card-info p { margin: 0 0 0.6em; overflow-wrap: anywhere; }
 .chat .examples { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .chat .examples .starter { height: auto; min-height: 44px; align-items: center; padding: 10px 14px; }
 .chat .links-card { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

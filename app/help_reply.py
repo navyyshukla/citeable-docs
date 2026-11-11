@@ -6,6 +6,7 @@ The question is data, never instructions: it goes in the user message only. The 
 if it is plain, short text with no link, code or list (it is shown as text, never as HTML).
 """
 import re
+import unicodedata
 
 from app.config import Config
 from app.llm.base import Adapter
@@ -13,6 +14,13 @@ from app.llm.base import Adapter
 MAX_REPLY_CHARS = 900
 _EDGE = " \t\r\n.,;:!?\"'`*()[]"
 _LIST_LINE = re.compile(r"(?m)^\s*(?:\d+[.)]|[-*•])\s")
+_NOT_COVERED = re.compile(r"\bnot[\s_-]*covered\b", re.IGNORECASE)  # the model's "no answer" marker
+_ODD = {"Cc", "Cf", "Zl", "Zp"}  # control, invisible and line-separator characters
+
+
+def _has_odd_characters(text: str) -> bool:
+    # NUL would crash the database write (a 500); invisible characters make an empty-looking card.
+    return any(unicodedata.category(ch) in _ODD and ch not in "\n\t\r" for ch in text)
 
 
 def build_help_prompts(question: str, cfg: Config) -> tuple[str, str]:
@@ -38,7 +46,9 @@ def clean_reply(text: object) -> str | None:
     if not t or len(t) > MAX_REPLY_CHARS:
         return None
     low = t.lower()
-    if low.lstrip(_EDGE).startswith("not_covered"):
+    if low.lstrip(_EDGE).startswith("not_covered") or _NOT_COVERED.search(t):
+        return None  # the marker anywhere in the reply, however the model words it
+    if _has_odd_characters(t):
         return None
     if "http" in low or "www." in low or "//" in low or "`" in t or _LIST_LINE.search(t):
         return None

@@ -439,3 +439,19 @@ def test_about_card_makes_no_second_call_and_no_text():
     r = svc.ask("good", "what is visidata")
     assert r.kind == "about" and r.text == "" and provider.calls == 1
     assert usage.finished[0][1]["answer_text"] == "card:about"
+
+
+def test_card_row_names_the_classifier_even_when_the_reply_came_from_another_model():
+    class TwoModels(Fake):
+        """The classifier is answered by 'fast'; the help reply by 'slow'."""
+
+        def complete(self, system, user, max_tokens, timeout=None):
+            c = super().complete(system, user, max_tokens, timeout)
+            who = "fast" if "exactly one word" in system else "slow"
+            return Completion(c.text, who, who + "-model", c.input_tokens, c.output_tokens,
+                              c.neurons, c.seconds)
+
+    svc, usage, *_ = make(provider=TwoModels(label="help", help_text="I only answer VisiData questions."))
+    r = svc.ask("good", "tell me about you")
+    kw = usage.finished[0][1]
+    assert r.text and (kw["provider"], kw["model"]) == ("fast", "fast-model")  # who classified

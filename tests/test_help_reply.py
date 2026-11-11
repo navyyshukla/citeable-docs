@@ -39,9 +39,16 @@ def test_clean_reply_keeps_good_replies(text):
     "", "   ", None, 5, "x" * 901, "see https://x.example", "visit WWW.x.org", "go to //x.org/a",
     "HTTPS://X.ORG", "use `Ctrl+S`", "```\ncode\n```", "1. open the sheet\n2. press q",
     "NOT_COVERED", " not_covered. ", "NOT_COVERED because I do not know", "Not_Covered\n",
+    "I am sorry, NOT_COVERED", "NOT COVERED", "Not covered.", "this is not-covered by my facts",
+    "a\x00b", "a\u202eb", "\u200b", "a\u2028b", "bell\x07",
 ])
 def test_clean_reply_rejects_unusable_replies(text):
     assert clean_reply(text) is None
+
+
+def test_clean_reply_keeps_ordinary_text_with_newlines_and_a_word_like_discovered():
+    assert clean_reply("Covered by the docs.\n\nSecond line.") is not None  # "covered" alone is fine
+    assert clean_reply("I am not discovered by search.") is not None
 
 
 def test_clean_reply_allows_exactly_900_characters():

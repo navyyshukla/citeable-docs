@@ -130,8 +130,9 @@ class AnswerService:
             classifier_calls = adapter.calls_made
             if kind != "normal":  # a card: no docs search, no answer call, no docs index needed
                 # Only the help card gets a model reply (from a fact sheet); None = fixed card.
+                classified = adapter.last_completion  # who classified, before any help reply
                 text = answer_help(q, adapter, self.cfg) if kind == "help" else None
-                return self._card_reply(rid, kind, adapter, text)
+                return self._card_reply(rid, kind, adapter, text, classified)
             index = self._load_index()
             hits = index.searcher.search("hybrid", q, self.cfg.search.top_k)
             a = answer_question(q, hits, index.by_id, adapter, self.cfg, self.cfg.project.name,
@@ -164,8 +165,8 @@ class AnswerService:
                          index.docs_version, index.last_updated)
 
     def _card_reply(self, request_id: str, kind: str, adapter: Adapter,
-                    text: str | None = None) -> AskResult:
-        done = adapter.last_completion  # which provider and model made the classification
+                    text: str | None = None, done=None) -> AskResult:
+        # `done` is the classifier's completion, so provider/model always mean "who classified".
         try:
             self.usage.finish(
                 request_id, status="card",

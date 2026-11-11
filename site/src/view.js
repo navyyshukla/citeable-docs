@@ -117,10 +117,10 @@ export function cardView(kind, cards) {
   };
 }
 
-// The model's short reply inside the Help card: plain paragraphs, at most three, each cut at 600
-// characters. The page shows them with textContent only, so nothing here is ever HTML.
+// The model's short reply inside the Help card: plain paragraphs, at most three, each cut at 900
+// characters (the most the server lets through). The page shows them with textContent only, so nothing here is ever HTML.
 export function helpParagraphs(value) {
   if (typeof value !== "string") return [];
   return value.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p !== "")
-    .slice(0, 3).map((p) => p.slice(0, 600));
+    .slice(0, 3).map((p) => p.slice(0, 900));
 }

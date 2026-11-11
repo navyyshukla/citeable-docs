@@ -82,7 +82,7 @@ and two switches, `links` (show the start-here links) and `examples` (show the f
 questions as clickable examples). Edit the text there; no code change is needed. `limits.classifier_max_tokens`
 (64: Groq counts its hidden reasoning inside it, so 16 cut every call off) is the reply budget and `limits.classifier_timeout_seconds` (5) the longest wait for the one-word classifier call that runs on every question (applied to each connection phase separately, so a slow provider can take up to about 10 s, and a 3-provider chain up to about 30 s). The page
 builds the cards from its own copy of this config, so a text change needs the page to be rebuilt
-(a push to `main` does it). The API sends only `status: "card"` and `kind`.
+(a push to `main` does it). The API sends `status: "card"` and `kind`, plus `text` when the model answered a help question.
 Rollout: the API (Render) and the page (Pages) deploy separately from one push; for a minute or two
 an old page may show "Something unexpected came back" for a card question. Card questions are logged
 with status `card` and count against the daily caps. To re-check the classifier after changing
