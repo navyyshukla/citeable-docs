@@ -47,3 +47,21 @@ def test_ci_runs_the_site_tests_with_node():
     assert any(str(s.get("uses", "")).startswith("actions/setup-node") for s in steps)
     # a glob, not the directory form: the directory form fails on current Node (ledger, Task 5)
     assert "node --test site/tests/*.test.js" in text
+
+
+def test_purge_runs_daily_and_on_demand_and_reads_only_the_purge_secret():
+    text, data = load("purge.yml")
+    on = triggers(data)
+    assert set(on) == {"schedule", "workflow_dispatch"}
+    assert len(on["schedule"]) == 1 and on["schedule"][0]["cron"].split()[2:] == ["*", "*", "*"]
+    assert data["permissions"] == {"contents": "read"}
+    assert text.count("secrets.") == 1 and "secrets.PURGE_DATABASE_URL" in text
+    assert "python -m app.cli purge" in text
+
+
+def test_purge_secret_goes_into_the_environment_not_the_command_line():
+    text, data = load("purge.yml")
+    steps = data["jobs"]["purge"]["steps"]
+    purge_step = next(s for s in steps if "app.cli purge" in s.get("run", ""))
+    assert purge_step["env"]["DATABASE_URL"] == "${{ secrets.PURGE_DATABASE_URL }}"
+    assert "echo" not in purge_step["run"] and "${{" not in purge_step["run"]

@@ -110,6 +110,30 @@ in that browser only. To see both themes without changing the device setting, pr
 `/evals` follows the device setting only (no button). A browser may keep an old copy of the page's
 script files while you iterate: use a private window or serve with a no-cache header.
 
+## Retention: the daily purge (owner action, once)
+
+The page promises that questions and answers are deleted after `limits.retention_days` (30). Two
+things keep that promise:
+
+1. **A scheduled job**, `.github/workflows/purge.yml`, runs `python -m app.cli purge` every day at
+   01:23 UTC (and on demand: Actions -> purge -> Run workflow). It needs one repository secret,
+   `PURGE_DATABASE_URL`, the production database address. Set it once from your machine, reading
+   the value from your local `.env` so it never appears on screen or in shell history:
+
+   ```
+   set -a; . ./.env; set +a; printf %s "$DATABASE_URL" | gh secret set PURGE_DATABASE_URL
+   ```
+
+   The job prints only a count ("deleted N questions older than 30 days"). To change the window,
+   change `limits.retention_days` in `config/visidata.yaml`.
+2. **A safety net in the API:** the first question of each UTC day (and the first after every
+   wake-up) also runs the purge. It never fails a question; a day only counts as done once the purge
+   worked. This covers GitHub pausing scheduled jobs in a public repository after 60 days with no
+   activity (you would get no failure email either).
+
+To check it: run the workflow by hand and read the log line; `python -m app.cli purge --days 3650`
+deletes nothing on a young database. If the secret is missing the job fails and GitHub emails you.
+
 ## Enabling Pages (owner action, once)
 
 The page is a static site on GitHub Pages, deployed by `.github/workflows/pages.yml` on pushes to

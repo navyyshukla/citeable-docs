@@ -42,7 +42,7 @@ What a visitor gets:
 
 - **Docs are ingested at deploy time**, chunked by heading, embedded and stored in Postgres with pgvector (Neon). They are never committed here.
 - **Free tiers only, no card:** GitHub Pages, Render, Neon, Cloudflare Workers AI (about 10,000 neurons a day, the API stops at 8,000), Groq. Gemini's free tier is used only to grade test answers, and only with public test questions: user questions are never sent to it.
-- **Privacy:** questions and answers are logged with a 30-day retention window and removed by `python -m app.cli purge` (an automatic schedule for it is not set up yet); invite tokens are stored only as hashes; the server's access log is off. The page's privacy notice lists every provider a question is sent to.
+- **Privacy:** questions and answers are kept for 30 days and then deleted by a daily scheduled job (with a safety net in the API that purges once a day when it gets a question); invite tokens are stored only as hashes; the server's access log is off. The page's privacy notice lists every provider a question is sent to.
 - **Safety:** the page has a strict content-security policy (no third-party loads, no inline scripts); model text is shown as plain text or through a renderer that only allows citation links to the docs; the assistant has no tools and no private data.
 
 ## Does it work? (read `/evals` before trusting any number)

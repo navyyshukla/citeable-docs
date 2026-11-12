@@ -1,0 +1,24 @@
+name: purge
+# Deletes questions (and their feedback) older than the retention window, every day, so the
+# privacy notice on the page is kept. The database address is a repository secret
+# (PURGE_DATABASE_URL); this workflow reads nothing else and prints only a count. The API also
+# purges once a day when it gets a question, in case GitHub pauses scheduled jobs.
+on:
+  schedule:
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Delete questions older than the retention window
+        run: python -m app.cli purge
+        env:
+          DATABASE_URL: ${{ secrets.PURGE_DATABASE_URL }}

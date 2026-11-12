@@ -2,7 +2,7 @@
 import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.answer import Citation, answer_question, validate_question
 from app.classify import classify_question
@@ -54,9 +54,12 @@ class _Index:
 
 class AnswerService:
     def __init__(self, cfg: Config, usage: Usage, store: Store,
-                 make_adapter: Callable[[], Adapter], embed_query: Callable[[str], list[float]]):
+                 make_adapter: Callable[[], Adapter], embed_query: Callable[[str], list[float]],
+                 today: Callable[[], date] | None = None):
         self.cfg, self.usage, self.store = cfg, usage, store
         self.make_adapter, self.embed_query = make_adapter, embed_query
+        self._today = today or (lambda: datetime.now(timezone.utc).date())
+        self._purged_on: date | None = None  # the UTC day the retention purge last worked
         self._index: _Index | None = None
         self._lock = threading.Lock()
 
@@ -100,8 +103,24 @@ class AnswerService:
             raise AskError(401, "Unknown or revoked invite link.")
         return tid
 
+    def _purge_if_due(self) -> None:
+        """Safety net for the privacy promise (old questions are deleted after the retention
+        window). The scheduled job is the main purge; this runs it once per UTC day when a question
+        arrives, so retention still holds if that job is paused (GitHub pauses scheduled jobs in a
+        public repo after 60 quiet days). It can never fail a question, and a day only counts as
+        done once the purge worked, so a failure is retried on the next question."""
+        today = self._today()
+        if self._purged_on == today:
+            return
+        try:
+            self.usage.purge(self.cfg.limits.retention_days)
+            self._purged_on = today
+        except Exception:  # noqa: BLE001 - never let housekeeping break an answer
+            pass
+
     def ask(self, token: str, question: str) -> AskResult:
         token_id = self._token_id(token)
+        self._purge_if_due()  # only for a valid invite: junk tokens never touch the database
         try:
             q = validate_question(question, self.cfg)
         except ValueError as e:

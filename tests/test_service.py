@@ -455,3 +455,53 @@ def test_card_row_names_the_classifier_even_when_the_reply_came_from_another_mod
     r = svc.ask("good", "tell me about you")
     kw = usage.finished[0][1]
     assert r.text and (kw["provider"], kw["model"]) == ("fast", "fast-model")  # who classified
+
+
+# ---- the daily purge safety net (the scheduled job is the main purge; this covers it pausing) ----
+
+def _purging_service(usage, days):
+    """A service whose clock is a list the test moves forward."""
+    svc = AnswerService(CFG, usage, FakeStore(), lambda: Adapter([Fake(label="about")]),
+                        embed_query=lambda t: [0.0], today=lambda: days[0])
+    return svc
+
+
+def test_the_first_question_of_a_day_purges_old_rows_once():
+    from datetime import date
+    usage = FakeUsage()
+    usage.purged = []
+    usage.purge = lambda older_than_days: usage.purged.append(older_than_days) or 3
+    days = [date(2026, 11, 12)]
+    svc = _purging_service(usage, days)
+    svc.ask("good", "what is visidata")
+    svc.ask("good", "what is visidata")
+    assert usage.purged == [CFG.limits.retention_days]  # once, with the configured window
+    days[0] = date(2026, 11, 13)
+    svc.ask("good", "what is visidata")
+    assert usage.purged == [CFG.limits.retention_days] * 2  # a new day purges again
+
+
+def test_a_failing_purge_never_fails_the_question_and_is_retried():
+    from datetime import date
+    usage = FakeUsage()
+    calls = []
+
+    def broken(older_than_days):
+        calls.append(1)
+        raise DbUnavailable("down")
+
+    usage.purge = broken
+    svc = _purging_service(usage, [date(2026, 11, 12)])
+    assert svc.ask("good", "what is visidata").status == "card"  # the visitor never notices
+    svc.ask("good", "what is visidata")
+    assert len(calls) == 2  # a day is marked done only after the purge worked
+
+
+def test_an_unauthorised_visitor_does_not_trigger_the_purge():
+    from datetime import date
+    usage = FakeUsage()
+    usage.purge = lambda older_than_days: (_ for _ in ()).throw(AssertionError("purged"))
+    svc = _purging_service(usage, [date(2026, 11, 12)])
+    with pytest.raises(AskError) as e:
+        svc.ask("bad-token", "what is visidata")
+    assert e.value.status == 401
