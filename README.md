@@ -12,6 +12,7 @@ An unofficial, free "ask the docs" assistant for [VisiData](https://www.visidata
 | Test results page | https://navyyshukla.github.io/citeable-docs/evals.html | live, public |
 | API | `https://citeable-docs-api.onrender.com` (free tier, Ohio) | live; the first request after idle can take up to about 30 seconds |
 | Docs indexed | VisiData `stable` docs, 229 pieces | live |
+| Privacy purge | GitHub scheduled job, daily 01:23 UTC (plus a safety net in the API) | running; deletes questions older than 30 days |
 
 What a visitor gets:
 - **A docs question** ("how do I rename a column?") gets a short answer with numbered source links to the docs page and section it came from.
@@ -56,6 +57,12 @@ The `/evals` page shows every measured result with its count, range and caveats.
 These sets are small: one question moves a rate by about 5 points. The held-out labels are AI-checked only and no human has graded those answers yet; the AI judge used for part of the checking is a rough filter that cannot see docs errors; and the docs contain at least one error the assistant repeats (the sort page's `[` and `]` keys). Friends' questions in the beta are the next held-out check.
 
 Known limits: no memory between questions (follow-up questions like "what else?" cannot be answered yet); free-tier cold starts; search misses some plainly worded questions; answer quality depends on what the docs say.
+
+## What is next
+
+- **Better search for plainly worded questions** (designed, not built): the measured main limit is search, not the model. The right docs page was in the top 5 results for 84% of the sealed held-out questions, and when it was, the assistant answered 94% of the time. The plan re-weights how the keyword and meaning searches are combined, tuned on the development sets and confirmed once on a new sealed question set (`docs/superpowers/plans/2026-11-13-plan-7-better-search.md`).
+- **Hand-grading a sample of answers**, the one true quality measure still missing.
+- **A closed beta** with a few friends; their real questions become the next held-out test set.
 
 ## Repository map
 
